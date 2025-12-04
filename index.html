@@ -1705,8 +1705,28 @@
         <i class="fas fa-key"></i>
     </button>
 
+    <!-- Firebase SDK и основной код приложения -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
     <script>
-        // Конфигурация приложения
+        // === ВАША КОНФИГУРАЦИЯ FIREBASE (ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ!) ===
+        const firebaseConfig = {
+            apiKey: "ВАШ_API_KEY",
+            authDomain: "ВАШ_ПРОЕКТ.firebaseapp.com",
+            databaseURL: "https://ВАШ_ПРОЕКТ-default-rtdb.firebaseio.com",
+            projectId: "ВАШ_ПРОЕКТ",
+            storageBucket: "ВАШ_ПРОЕКТ.appspot.com",
+            messagingSenderId: "ВАШ_SENDER_ID",
+            appId: "ВАШ_APP_ID"
+        };
+
+        // === ИНИЦИАЛИЗАЦИЯ FIREBASE ===
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
         const APP_CONFIG = {
             ADMIN_KEYS: [
                 "SMILE-ADMIN-2024-001",
@@ -1720,11 +1740,9 @@
                 "MASTER-KEY-009",
                 "SMILE-SUPER-010"
             ],
-            API_URL: "https://api.smileparfume.com",
             APP_NAME: "Smile Parfume"
         };
 
-        // Глобальные переменные и состояние приложения
         const state = {
             currentUser: null,
             products: [],
@@ -1738,117 +1756,195 @@
             bannerHidden: false
         };
 
-        // База данных товаров
-        const defaultProducts = [
-            {
-                id: 1,
-                name: "Chanel No. 5",
-                price: 7500,
-                description: "Легендарный женский аромат, созданный в 1921 году. Сочетает ноты иланг-иланга, бергамота и сандала. Идеален для вечерних выходов и особых случаев.",
-                tags: ["women", "classic", "floral", "evening", "luxury"],
-                code: "CHN-001",
-                image: "",
-                emoji: "🌹",
-                rating: 4.8
-            },
-            {
-                id: 2,
-                name: "Dior Sauvage",
-                price: 6800,
-                description: "Смелый мужской аромат, воплощающий дух свободы. Ноты перца, бергамота и амбры создают мощный и притягательный образ.",
-                tags: ["men", "fresh", "woody", "day", "popular"],
-                code: "DIR-002",
-                image: "",
-                emoji: "🏔️",
-                rating: 4.7
-            },
-            {
-                id: 3,
-                name: "Jo Malone Wood Sage",
-                price: 9200,
-                description: "Утонченный унисекс парфюм с аккордами шалфея, морской соли и грейпфрута. Свежий и элегантный аромат для повседневного использования.",
-                tags: ["unisex", "woody", "fresh", "day", "minimalist"],
-                code: "JML-003",
-                image: "",
-                emoji: "🌿",
-                rating: 4.6
-            },
-            {
-                id: 4,
-                name: "Yves Saint Laurent Black Opium",
-                price: 8100,
-                description: "Энергичный женский аромат с кофейными нотами и белыми цветами. Завораживающий и страстный, идеален для вечерних мероприятий.",
-                tags: ["women", "evening", "coffee", "floral", "intense"],
-                code: "YSL-004",
-                image: "",
-                emoji: "☕",
-                rating: 4.5
-            },
-            {
-                id: 5,
-                name: "Creed Aventus",
-                price: 12500,
-                description: "Премиальный мужской парфюм с нотами ананаса, березы и мускуса. Для настоящих ценителей эксклюзивных ароматов.",
-                tags: ["men", "luxury", "fruity", "evening", "exclusive"],
-                code: "CRD-005",
-                image: "",
-                emoji: "👑",
-                rating: 4.9
-            },
-            {
-                id: 6,
-                name: "Maison Margiela REPLICA",
-                price: 7600,
-                description: "Унисекс аромат, воссоздающий атмосферу воскресного утра. Уютный и расслабляющий, с нотами лаванды и мускуса.",
-                tags: ["unisex", "fresh", "linen", "day", "comfort"],
-                code: "MMM-006",
-                image: "",
-                emoji: "🛏️",
-                rating: 4.4
-            },
-            {
-                id: 7,
-                name: "Tom Ford Black Orchid",
-                price: 9800,
-                description: "Роскошный унисекс аромат с нотами черной трюфели, пачули и иланг-иланга. Загадочный и чувственный.",
-                tags: ["unisex", "evening", "luxury", "oriental", "intense"],
-                code: "TFN-007",
-                image: "",
-                emoji: "🍫",
-                rating: 4.6
-            },
-            {
-                id: 8,
-                name: "Gucci Bloom",
-                price: 7200,
-                description: "Цветочный женский аромат с нотами жасмина, туберозы и рангун-крипера. Свежий и романтичный.",
-                tags: ["women", "floral", "day", "romantic", "spring"],
-                code: "GUC-008",
-                image: "",
-                emoji: "🌸",
-                rating: 4.3
-            }
-        ];
+        // === ОСНОВНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С FIREBASE ===
 
-        // Инициализация приложения
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
+        async function loadDataFromFirebase() {
+            try {
+                // Загружаем все основные данные параллельно
+                const [productsSnapshot, tagsSnapshot, reviewsSnapshot, usersSnapshot] = await Promise.all([
+                    database.ref('products').once('value'),
+                    database.ref('tags').once('value'),
+                    database.ref('reviews').once('value'),
+                    database.ref('users').once('value')
+                ]);
+
+                // Преобразуем данные из Firebase в массивы
+                state.products = productsSnapshot.exists() ? 
+                    Object.entries(productsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
+                
+                state.tags = tagsSnapshot.exists() ? 
+                    Object.entries(tagsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
+                
+                state.reviews = reviewsSnapshot.exists() ? 
+                    Object.entries(reviewsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
+                
+                state.users = usersSnapshot.exists() ? 
+                    Object.entries(usersSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
+
+                // Если нет товаров, загружаем начальные данные
+                if (state.products.length === 0) {
+                    await loadDefaultProducts();
+                }
+
+                console.log('Данные успешно загружены из Firebase');
+                
+            } catch (error) {
+                console.error('Ошибка загрузки данных из Firebase:', error);
+                // Запасной вариант: загрузка из localStorage
+                loadFromLocalStorage();
+            }
+        }
+
+        async function saveProductToFirebase(product) {
+            try {
+                const productData = { ...product };
+                delete productData.id; // Удаляем ID из данных для записи
+                
+                if (product.id && !product.id.startsWith('-')) {
+                    // Обновление существующего товара
+                    await database.ref(`products/${product.id}`).update(productData);
+                    return product.id;
+                } else {
+                    // Создание нового товара
+                    const newProductRef = await database.ref('products').push(productData);
+                    return newProductRef.key;
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения товара:', error);
+                throw error;
+            }
+        }
+
+        async function saveTagToFirebase(tag) {
+            try {
+                const tagData = { ...tag };
+                delete tagData.id;
+                
+                if (tag.id) {
+                    await database.ref(`tags/${tag.id}`).update(tagData);
+                    return tag.id;
+                } else {
+                    const newTagRef = await database.ref('tags').push(tagData);
+                    return newTagRef.key;
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения тега:', error);
+                throw error;
+            }
+        }
+
+        async function saveReviewToFirebase(review) {
+            try {
+                const newReviewRef = await database.ref('reviews').push(review);
+                return newReviewRef.key;
+            } catch (error) {
+                console.error('Ошибка сохранения отзыва:', error);
+                throw error;
+            }
+        }
+
+        async function saveUserToFirebase(user) {
+            try {
+                if (user.id) {
+                    await database.ref(`users/${user.id}`).update(user);
+                    return user.id;
+                } else {
+                    const newUserRef = await database.ref('users').push(user);
+                    return newUserRef.key;
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения пользователя:', error);
+                throw error;
+            }
+        }
+
+        async function saveCartToFirebase() {
+            if (state.currentUser && state.currentUser.uid) {
+                try {
+                    await database.ref(`carts/${state.currentUser.uid}`).set(state.cart);
+                } catch (error) {
+                    console.error('Ошибка сохранения корзины:', error);
+                }
+            }
+        }
+
+        async function handleFirebaseAuth(email, password, name = null, isRegistration = false) {
+            try {
+                let userCredential;
+                
+                if (isRegistration) {
+                    // Регистрация нового пользователя
+                    userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    
+                    // Сохраняем информацию о пользователе в базе данных
+                    await database.ref(`users/${userCredential.user.uid}`).set({
+                        name: name,
+                        email: email,
+                        role: 'user',
+                        createdAt: new Date().toISOString()
+                    });
+                    
+                } else {
+                    // Вход существующего пользователя
+                    userCredential = await auth.signInWithEmailAndPassword(email, password);
+                }
+                
+                return userCredential.user;
+                
+            } catch (error) {
+                console.error('Ошибка аутентификации:', error);
+                throw error;
+            }
+        }
+
+        // === ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ===
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Настройка слушателя изменения статуса аутентификации
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    // Загружаем данные пользователя из базы
+                    const userSnapshot = await database.ref(`users/${user.uid}`).once('value');
+                    const userData = userSnapshot.val();
+                    
+                    state.currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        ...userData
+                    };
+                    
+                    // Загружаем корзину пользователя
+                    const cartSnapshot = await database.ref(`carts/${user.uid}`).once('value');
+                    state.cart = cartSnapshot.exists() ? Object.values(cartSnapshot.val()) : [];
+                    
+                    updateCartDisplay();
+                } else {
+                    state.currentUser = null;
+                    state.cart = [];
+                }
+                
+                updateAuthButton();
+            });
+
+            // Загружаем основные данные
+            await loadDataFromFirebase();
+            
+            // Настраиваем обработчики событий и интерфейс
             setupEventListeners();
             loadInitialData();
             updateUI();
         });
 
-        // Инициализация приложения
-        function initializeApp() {
-            // Загрузка данных из localStorage
+        // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+        function loadFromLocalStorage() {
+            // Запасной вариант: загрузка из localStorage
             const savedProducts = localStorage.getItem('smileProducts');
             const savedUsers = localStorage.getItem('smileUsers');
             const savedReviews = localStorage.getItem('smileReviews');
             const savedTags = localStorage.getItem('smileTags');
             const savedCart = localStorage.getItem('smileCart');
             const savedTheme = localStorage.getItem('smileTheme');
-            const savedUser = localStorage.getItem('currentUser');
-            const savedBannerHidden = localStorage.getItem('smileBannerHidden');
 
             if (savedProducts) state.products = JSON.parse(savedProducts);
             if (savedUsers) state.users = JSON.parse(savedUsers);
@@ -1860,29 +1956,212 @@
                 document.getElementById('theme-select').value = savedTheme;
                 document.body.className = `theme-${savedTheme}`;
             }
-            if (savedUser) state.currentUser = JSON.parse(savedUser);
-            if (savedBannerHidden) {
-                state.bannerHidden = JSON.parse(savedBannerHidden);
-                if (state.bannerHidden) {
-                    document.getElementById('top-banner').classList.add('hidden');
-                    document.getElementById('show-banner').style.display = 'block';
+        }
+
+        async function loadDefaultProducts() {
+            const defaultProducts = [
+                {
+                    name: "Chanel No. 5",
+                    price: 7500,
+                    description: "Легендарный женский аромат, созданный в 1921 году. Сочетает ноты иланг-иланга, бергамота и сандала. Идеален для вечерних выходов и особых случаев.",
+                    tags: ["women", "classic", "floral", "evening", "luxury"],
+                    code: "CHN-001",
+                    image: "",
+                    emoji: "🌹",
+                    rating: 4.8,
+                    reviewsCount: 0
+                },
+                {
+                    name: "Dior Sauvage",
+                    price: 6800,
+                    description: "Смелый мужской аромат, воплощающий дух свободы. Ноты перца, бергамота и амбры создают мощный и притягательный образ.",
+                    tags: ["men", "fresh", "woody", "day", "popular"],
+                    code: "DIR-002",
+                    image: "",
+                    emoji: "🏔️",
+                    rating: 4.7,
+                    reviewsCount: 0
+                },
+                {
+                    name: "Jo Malone Wood Sage",
+                    price: 9200,
+                    description: "Утонченный унисекс парфюм с аккордами шалфея, морской соли и грейпфрута. Свежий и элегантный аромат для повседневного использования.",
+                    tags: ["unisex", "woody", "fresh", "day", "minimalist"],
+                    code: "JML-003",
+                    image: "",
+                    emoji: "🌿",
+                    rating: 4.6,
+                    reviewsCount: 0
                 }
+            ];
+
+            // Сохраняем каждый продукт в Firebase
+            for (const product of defaultProducts) {
+                await saveProductToFirebase(product);
+            }
+            
+            // Перезагружаем данные
+            await loadDataFromFirebase();
+        }
+
+        // === ОСНОВНЫЕ ФУНКЦИИ ПРИЛОЖЕНИЯ (ОБНОВЛЕННЫЕ ДЛЯ FIREBASE) ===
+
+        async function addToCart(productId) {
+            const product = state.products.find(p => p.id === productId);
+            if (!product) return;
+
+            const existingItem = state.cart.find(item => item.productId === productId);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                state.cart.push({
+                    productId: productId,
+                    quantity: 1,
+                    name: product.name,
+                    price: product.price,
+                    image: product.image,
+                    emoji: product.emoji
+                });
             }
 
-            // Если нет данных, загружаем начальные
-            if (state.products.length === 0) {
-                state.products = defaultProducts;
-                localStorage.setItem('smileProducts', JSON.stringify(state.products));
+            // Сохраняем в Firebase
+            await saveCartToFirebase();
+            
+            // Также сохраняем в localStorage как запасной вариант
+            localStorage.setItem('smileCart', JSON.stringify(state.cart));
+            
+            updateCartCount();
+            updateCartDisplay();
+            showMessage(`Товар "${product.name}" добавлен в корзину!`, 'success');
+        }
+
+        async function updateCartItemQuantity(productId, newQuantity) {
+            if (newQuantity < 1) {
+                removeFromCart(productId);
+                return;
             }
-            if (state.tags.length === 0) {
-                loadDefaultTags();
-            }
-            if (state.users.length === 0) {
-                loadDefaultUsers();
+
+            const item = state.cart.find(item => item.productId === productId);
+            if (item) {
+                item.quantity = newQuantity;
+                await saveCartToFirebase();
+                localStorage.setItem('smileCart', JSON.stringify(state.cart));
+                updateCartCount();
+                updateCartDisplay();
             }
         }
 
-        // Настройка обработчиков событий
+        async function removeFromCart(productId) {
+            state.cart = state.cart.filter(item => item.productId !== productId);
+            await saveCartToFirebase();
+            localStorage.setItem('smileCart', JSON.stringify(state.cart));
+            updateCartCount();
+            updateCartDisplay();
+        }
+
+        async function submitReview(productId) {
+            if (!state.currentUser) {
+                showMessage('Войдите, чтобы оставить отзыв', 'error');
+                return;
+            }
+
+            const ratingElements = document.querySelectorAll('#review-rating .star.active');
+            const rating = ratingElements.length;
+            const text = document.getElementById('review-text').value;
+
+            if (rating === 0) {
+                showMessage('Пожалуйста, поставьте оценку', 'error');
+                return;
+            }
+
+            if (!text.trim()) {
+                showMessage('Пожалуйста, напишите отзыв', 'error');
+                return;
+            }
+
+            const newReview = {
+                productId: productId,
+                userId: state.currentUser.uid,
+                userName: state.currentUser.name,
+                rating: rating,
+                text: text,
+                date: new Date().toISOString()
+            };
+
+            try {
+                // Сохраняем в Firebase
+                const reviewId = await saveReviewToFirebase(newReview);
+                
+                // Обновляем локальное состояние
+                state.reviews.push({ ...newReview, id: reviewId });
+                
+                showMessage('Спасибо за ваш отзыв!', 'success');
+                document.getElementById('product-modal').classList.remove('active');
+                
+            } catch (error) {
+                console.error('Ошибка сохранения отзыва:', error);
+                showMessage('Ошибка при сохранении отзыва', 'error');
+            }
+        }
+
+        async function saveProduct() {
+            const id = document.getElementById('product-id').value;
+            const name = document.getElementById('product-name').value;
+            const price = parseInt(document.getElementById('product-price').value);
+            const description = document.getElementById('product-description').value;
+            const code = document.getElementById('product-code').value;
+            const emoji = document.getElementById('product-emoji').value;
+            const image = document.getElementById('product-image').value;
+            
+            // Получить теги из контейнера
+            const tags = [];
+            document.querySelectorAll('#product-tags-container .tag-input').forEach(tagEl => {
+                tags.push(tagEl.textContent.replace('×', '').trim());
+            });
+            
+            const productData = {
+                name,
+                price,
+                description,
+                code,
+                emoji,
+                image,
+                tags,
+                rating: 4.5,
+                reviewsCount: 0
+            };
+            
+            try {
+                // Сохраняем в Firebase
+                const productId = await saveProductToFirebase({
+                    ...productData,
+                    id: id || null
+                });
+                
+                // Обновляем локальное состояние
+                if (state.editingProduct) {
+                    const index = state.products.findIndex(p => p.id === state.editingProduct.id);
+                    if (index !== -1) {
+                        state.products[index] = { ...productData, id: productId };
+                    }
+                } else {
+                    state.products.push({ ...productData, id: productId });
+                }
+                
+                // Обновляем UI
+                loadAdminData();
+                loadInitialData();
+                hideProductForm();
+                showMessage('Товар успешно сохранен!', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка сохранения товара:', error);
+                showMessage('Ошибка при сохранении товара', 'error');
+            }
+        }
+
+        // === ВАШ СУЩЕСТВУЮЩИЙ КОД (с минимальными изменениями) ===
+
         function setupEventListeners() {
             // Навигация
             document.querySelectorAll('.nav-link').forEach(link => {
@@ -1932,10 +2211,46 @@
                 }
             });
 
-            // Форма аутентификации
-            document.getElementById('auth-form').addEventListener('submit', function(e) {
+            // Форма аутентификации (обновленная для Firebase)
+            document.getElementById('auth-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                handleAuth();
+                
+                const email = document.getElementById('auth-email').value;
+                const password = document.getElementById('auth-password').value;
+                const name = document.getElementById('auth-name').value;
+                const confirmPassword = document.getElementById('auth-confirm-password').value;
+                const adminKey = document.getElementById('admin-key').value;
+                const isLogin = document.getElementById('auth-modal-title').textContent === 'Вход';
+
+                try {
+                    if (isLogin) {
+                        // Вход через Firebase
+                        const user = await handleFirebaseAuth(email, password, null, false);
+                        showMessage(`Добро пожаловать, ${user.email}!`, 'success');
+                    } else {
+                        // Регистрация через Firebase
+                        if (password !== confirmPassword) {
+                            showMessage('Пароли не совпадают!', 'error');
+                            return;
+                        }
+                        
+                        const user = await handleFirebaseAuth(email, password, name, true);
+                        
+                        // Проверка админского ключа
+                        if (adminKey && validateAdminKey(adminKey)) {
+                            await database.ref(`users/${user.uid}/role`).set('admin');
+                            state.currentUser.role = 'admin';
+                        }
+                        
+                        showMessage('Регистрация прошла успешно!', 'success');
+                    }
+                    
+                    document.getElementById('auth-modal').classList.remove('active');
+                    updateAuthButton();
+                    
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                }
             });
 
             // Форма обратной связи
@@ -2010,23 +2325,44 @@
             });
         }
 
-        // Скрыть верхнюю панель
-        function hideTopBanner() {
-            document.getElementById('top-banner').classList.add('hidden');
-            document.getElementById('show-banner').style.display = 'block';
-            state.bannerHidden = true;
-            localStorage.setItem('smileBannerHidden', JSON.stringify(true));
+        // Выход из системы (обновленный для Firebase)
+        async function logout() {
+            try {
+                await auth.signOut();
+                state.currentUser = null;
+                state.cart = [];
+                updateAuthButton();
+                updateCartDisplay();
+                showMessage('Вы вышли из системы', 'success');
+            } catch (error) {
+                console.error('Ошибка выхода:', error);
+                showMessage('Ошибка при выходе из системы', 'error');
+            }
         }
 
-        // Показать верхнюю панель
-        function showTopBanner() {
-            document.getElementById('top-banner').classList.remove('hidden');
-            document.getElementById('show-banner').style.display = 'none';
-            state.bannerHidden = false;
-            localStorage.setItem('smileBannerHidden', JSON.stringify(false));
+        // ... (остальные функции из вашего исходного кода остаются без изменений)
+
+        // === НАЧАЛО ВАШЕГО ИСХОДНОГО КОДА (с минимальными изменениями) ===
+
+        function initializeApp() {
+            // Загрузка данных из localStorage (запасной вариант)
+            const savedTheme = localStorage.getItem('smileTheme');
+            const savedBannerHidden = localStorage.getItem('smileBannerHidden');
+
+            if (savedTheme) {
+                state.currentTheme = savedTheme;
+                document.getElementById('theme-select').value = savedTheme;
+                document.body.className = `theme-${savedTheme}`;
+            }
+            if (savedBannerHidden) {
+                state.bannerHidden = JSON.parse(savedBannerHidden);
+                if (state.bannerHidden) {
+                    document.getElementById('top-banner').classList.add('hidden');
+                    document.getElementById('show-banner').style.display = 'block';
+                }
+            }
         }
 
-        // Загрузка начальных данных
         function loadInitialData() {
             displayProducts(state.products, 'featured-products');
             displayProducts(state.products, 'catalog-products');
@@ -2035,84 +2371,34 @@
             populateAvailableTags();
         }
 
-        // Обновление интерфейса
         function updateUI() {
             updateCartCount();
             updateAuthButton();
         }
 
-        // Загрузка тегов по умолчанию
-        function loadDefaultTags() {
-            // Собираем все теги из товаров
-            const allTags = new Set();
-            state.products.forEach(product => {
-                product.tags.forEach(tag => allTags.add(tag));
-            });
-            
-            state.tags = Array.from(allTags).map((tag, index) => ({
-                id: index + 1,
-                name: tag,
-                count: state.products.filter(p => p.tags.includes(tag)).length
-            }));
-            
-            localStorage.setItem('smileTags', JSON.stringify(state.tags));
-        }
-
-        // Загрузка пользователей по умолчанию
-        function loadDefaultUsers() {
-            state.users = [
-                { 
-                    id: 1, 
-                    name: "Admin", 
-                    email: "admin@smileparfume.ru", 
-                    password: "admin123", 
-                    role: "admin",
-                    createdAt: new Date().toISOString()
-                },
-                { 
-                    id: 2, 
-                    name: "User", 
-                    email: "user@example.com", 
-                    password: "user123", 
-                    role: "user",
-                    createdAt: new Date().toISOString()
-                }
-            ];
-            localStorage.setItem('smileUsers', JSON.stringify(state.users));
-        }
-
-        // Переключение между вкладками
         function switchTab(tabName) {
-            // Скрыть все вкладки
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
 
-            // Убрать активный класс у всех ссылок навигации
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.remove('active');
             });
 
-            // Показать выбранную вкладку
             document.getElementById(tabName).classList.add('active');
-
-            // Активировать соответствующую ссылку навигации
             document.querySelector(`.nav-link[data-tab="${tabName}"]`).classList.add('active');
 
-            // Особые действия для определенных вкладок
             if (tabName === 'cart') {
                 updateCartDisplay();
             }
         }
 
-        // Смена темы
         function changeTheme(themeName) {
             state.currentTheme = themeName;
             document.body.className = `theme-${themeName}`;
             localStorage.setItem('smileTheme', themeName);
         }
 
-        // Открытие модального окна аутентификации
         function openAuthModal(mode) {
             const modal = document.getElementById('auth-modal');
             const title = document.getElementById('auth-modal-title');
@@ -2138,7 +2424,6 @@
             modal.classList.add('active');
         }
 
-        // Открытие модального окна аутентификации администратора
         function openAdminAuthModal() {
             const modal = document.getElementById('auth-modal');
             const title = document.getElementById('auth-modal-title');
@@ -2156,80 +2441,10 @@
             modal.classList.add('active');
         }
 
-        // Обработка аутентификации
-        function handleAuth() {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            const name = document.getElementById('auth-name').value;
-            const confirmPassword = document.getElementById('auth-confirm-password').value;
-            const adminKey = document.getElementById('admin-key').value;
-            const isLogin = document.getElementById('auth-modal-title').textContent === 'Вход';
-
-            if (isLogin) {
-                // Вход
-                const user = state.users.find(u => u.email === email && u.password === password);
-                if (user) {
-                    state.currentUser = user;
-                    localStorage.setItem('currentUser', JSON.stringify(user));
-                    document.getElementById('auth-modal').classList.remove('active');
-                    updateAuthButton();
-                    showMessage(`Добро пожаловать, ${user.name}!`, 'success');
-                } else {
-                    showMessage('Неверный email или пароль!', 'error');
-                }
-            } else {
-                // Регистрация
-                if (state.users.find(u => u.email === email)) {
-                    showMessage('Пользователь с таким email уже существует!', 'error');
-                    return;
-                }
-
-                if (password !== confirmPassword) {
-                    showMessage('Пароли не совпадают!', 'error');
-                    return;
-                }
-
-                // Определяем роль пользователя
-                let role = 'user';
-                if (adminKey && validateAdminKey(adminKey)) {
-                    role = 'admin';
-                }
-
-                const newUser = {
-                    id: Date.now(),
-                    name: name,
-                    email: email,
-                    password: password,
-                    role: role,
-                    createdAt: new Date().toISOString()
-                };
-
-                state.users.push(newUser);
-                localStorage.setItem('smileUsers', JSON.stringify(state.users));
-
-                state.currentUser = newUser;
-                localStorage.setItem('currentUser', JSON.stringify(newUser));
-
-                document.getElementById('auth-modal').classList.remove('active');
-                updateAuthButton();
-                showMessage('Регистрация прошла успешно!', 'success');
-            }
-        }
-
-        // Проверка ключа администратора
         function validateAdminKey(key) {
             return APP_CONFIG.ADMIN_KEYS.includes(key);
         }
 
-        // Выход из системы
-        function logout() {
-            state.currentUser = null;
-            localStorage.removeItem('currentUser');
-            updateAuthButton();
-            showMessage('Вы вышли из системы', 'success');
-        }
-
-        // Обновление кнопки аутентификации
         function updateAuthButton() {
             const authBtn = document.getElementById('auth-btn');
             if (state.currentUser) {
@@ -2243,7 +2458,6 @@
             }
         }
 
-        // Открытие админ-панели
         function openAdminPanel() {
             if (state.currentUser && state.currentUser.role === 'admin') {
                 document.getElementById('admin-modal').classList.add('active');
@@ -2253,7 +2467,6 @@
             }
         }
 
-        // Загрузка данных для админ-панели
         function loadAdminData() {
             // Загрузка товаров
             const productsTable = document.getElementById('admin-products-table');
@@ -2263,8 +2476,8 @@
                     <td>${product.price} руб.</td>
                     <td>${product.tags.join(', ')}</td>
                     <td>
-                        <button class="action-btn btn-edit" onclick="editProduct(${product.id})">Редактировать</button>
-                        <button class="action-btn btn-delete" onclick="deleteProduct(${product.id})">Удалить</button>
+                        <button class="action-btn btn-edit" onclick="editProduct('${product.id}')">Редактировать</button>
+                        <button class="action-btn btn-delete" onclick="deleteProduct('${product.id}')">Удалить</button>
                     </td>
                 </tr>
             `).join('');
@@ -2274,10 +2487,10 @@
             tagsTable.innerHTML = state.tags.map(tag => `
                 <tr>
                     <td>${tag.name}</td>
-                    <td>${tag.count}</td>
+                    <td>${tag.count || 0}</td>
                     <td>
-                        <button class="action-btn btn-edit" onclick="editTag(${tag.id})">Редактировать</button>
-                        <button class="action-btn btn-delete" onclick="deleteTag(${tag.id})">Удалить</button>
+                        <button class="action-btn btn-edit" onclick="editTag('${tag.id}')">Редактировать</button>
+                        <button class="action-btn btn-delete" onclick="deleteTag('${tag.id}')">Удалить</button>
                     </td>
                 </tr>
             `).join('');
@@ -2287,12 +2500,12 @@
             reviewsTable.innerHTML = state.reviews.map(review => `
                 <tr>
                     <td>${getProductName(review.productId)}</td>
-                    <td>${getUserName(review.userId)}</td>
+                    <td>${review.userName || 'Неизвестный'}</td>
                     <td>${'★'.repeat(review.rating)}${'☆'.repeat(5-review.rating)}</td>
                     <td>${review.text.substring(0, 50)}...</td>
                     <td>
-                        <button class="action-btn btn-edit" onclick="editReview(${review.id})">Редактировать</button>
-                        <button class="action-btn btn-delete" onclick="deleteReview(${review.id})">Удалить</button>
+                        <button class="action-btn btn-edit" onclick="editReview('${review.id}')">Редактировать</button>
+                        <button class="action-btn btn-delete" onclick="deleteReview('${review.id}')">Удалить</button>
                     </td>
                 </tr>
             `).join('');
@@ -2305,33 +2518,26 @@
                     <td>${user.email}</td>
                     <td>${user.role}</td>
                     <td>
-                        <button class="action-btn btn-edit" onclick="editUser(${user.id})">Редактировать</button>
-                        <button class="action-btn btn-delete" onclick="deleteUser(${user.id})">Удалить</button>
+                        <button class="action-btn btn-edit" onclick="editUser('${user.id}')">Редактировать</button>
+                        <button class="action-btn btn-delete" onclick="deleteUser('${user.id}')">Удалить</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        // Переключение вкладок в админ-панели
         function switchAdminTab(tabName) {
-            // Скрыть все вкладки
             document.querySelectorAll('.admin-content').forEach(tab => {
                 tab.classList.remove('active');
             });
 
-            // Убрать активный класс у всех вкладок
             document.querySelectorAll('.admin-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
 
-            // Показать выбранную вкладку
             document.getElementById(`admin-${tabName}`).classList.add('active');
-
-            // Активировать соответствующую вкладку
             document.querySelector(`.admin-tab[data-admin-tab="${tabName}"]`).classList.add('active');
         }
 
-        // Показать форму товара
         function showProductForm(product = null) {
             const formContainer = document.getElementById('product-form-container');
             const formTitle = document.getElementById('product-form-title');
@@ -2350,13 +2556,11 @@
             formContainer.style.display = 'block';
         }
 
-        // Скрыть форму товара
         function hideProductForm() {
             document.getElementById('product-form-container').style.display = 'none';
             state.editingProduct = null;
         }
 
-        // Заполнить форму товара данными
         function fillProductForm(product) {
             document.getElementById('product-id').value = product.id;
             document.getElementById('product-name').value = product.name;
@@ -2366,7 +2570,6 @@
             document.getElementById('product-emoji').value = product.emoji || '';
             document.getElementById('product-image').value = product.image || '';
             
-            // Заполнить теги
             const tagsContainer = document.getElementById('product-tags-container');
             tagsContainer.innerHTML = '';
             product.tags.forEach(tag => {
@@ -2382,56 +2585,6 @@
             state.editingProduct = product;
         }
 
-        // Сохранить товар
-        function saveProduct() {
-            const id = document.getElementById('product-id').value;
-            const name = document.getElementById('product-name').value;
-            const price = parseInt(document.getElementById('product-price').value);
-            const description = document.getElementById('product-description').value;
-            const code = document.getElementById('product-code').value;
-            const emoji = document.getElementById('product-emoji').value;
-            const image = document.getElementById('product-image').value;
-            
-            // Получить теги из контейнера
-            const tags = [];
-            document.querySelectorAll('#product-tags-container .tag-input').forEach(tagEl => {
-                tags.push(tagEl.textContent.replace('×', '').trim());
-            });
-            
-            const productData = {
-                id: id ? parseInt(id) : Date.now(),
-                name,
-                price,
-                description,
-                code,
-                emoji,
-                image,
-                tags,
-                rating: 4.5,
-                reviews: 0
-            };
-            
-            if (state.editingProduct) {
-                // Обновить существующий товар
-                const index = state.products.findIndex(p => p.id === state.editingProduct.id);
-                if (index !== -1) {
-                    productData.rating = state.products[index].rating;
-                    productData.reviews = state.products[index].reviews;
-                    state.products[index] = productData;
-                }
-            } else {
-                // Добавить новый товар
-                state.products.push(productData);
-            }
-            
-            localStorage.setItem('smileProducts', JSON.stringify(state.products));
-            loadAdminData();
-            loadInitialData();
-            hideProductForm();
-            showMessage('Товар успешно сохранен!', 'success');
-        }
-
-        // Показать форму тега
         function showTagForm(tag = null) {
             const formContainer = document.getElementById('tag-form-container');
             const formTitle = document.getElementById('tag-form-title');
@@ -2449,48 +2602,55 @@
             formContainer.style.display = 'block';
         }
 
-        // Скрыть форму тега
         function hideTagForm() {
             document.getElementById('tag-form-container').style.display = 'none';
             state.editingTag = null;
         }
 
-        // Заполнить форму тега данными
         function fillTagForm(tag) {
             document.getElementById('tag-id').value = tag.id;
             document.getElementById('tag-name').value = tag.name;
             state.editingTag = tag;
         }
 
-        // Сохранить тег
-        function saveTag() {
+        async function saveTag() {
             const id = document.getElementById('tag-id').value;
             const name = document.getElementById('tag-name').value;
             
-            if (state.editingTag) {
-                // Обновить существующий тег
-                const index = state.tags.findIndex(t => t.id === state.editingTag.id);
-                if (index !== -1) {
-                    state.tags[index].name = name;
+            try {
+                let tagId;
+                if (state.editingTag) {
+                    tagId = await saveTagToFirebase({
+                        id: id,
+                        name: name,
+                        count: state.editingTag.count || 0
+                    });
+                    
+                    const index = state.tags.findIndex(t => t.id === state.editingTag.id);
+                    if (index !== -1) {
+                        state.tags[index].name = name;
+                    }
+                } else {
+                    const newTag = {
+                        name: name,
+                        count: 0
+                    };
+                    
+                    tagId = await saveTagToFirebase(newTag);
+                    state.tags.push({ ...newTag, id: tagId });
                 }
-            } else {
-                // Добавить новый тег
-                const newTag = {
-                    id: Date.now(),
-                    name: name,
-                    count: 0
-                };
-                state.tags.push(newTag);
+                
+                loadAdminData();
+                populateAvailableTags();
+                hideTagForm();
+                showMessage('Тег успешно сохранен!', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка сохранения тега:', error);
+                showMessage('Ошибка при сохранении тега', 'error');
             }
-            
-            localStorage.setItem('smileTags', JSON.stringify(state.tags));
-            loadAdminData();
-            populateAvailableTags();
-            hideTagForm();
-            showMessage('Тег успешно сохранен!', 'success');
         }
 
-        // Добавить тег к товару
         function addTagToProduct() {
             const tagSelect = document.getElementById('available-tags');
             const selectedTag = tagSelect.value;
@@ -2502,7 +2662,6 @@
             
             const tagsContainer = document.getElementById('product-tags-container');
             
-            // Проверить, не добавлен ли уже этот тег
             const existingTags = Array.from(tagsContainer.querySelectorAll('.tag-input')).map(el => 
                 el.textContent.replace('×', '').trim()
             );
@@ -2512,7 +2671,6 @@
                 return;
             }
             
-            // Добавить тег
             const tagElement = document.createElement('div');
             tagElement.className = 'tag-input';
             tagElement.innerHTML = `
@@ -2521,11 +2679,9 @@
             `;
             tagsContainer.appendChild(tagElement);
             
-            // Сбросить выбор
             tagSelect.value = '';
         }
 
-        // Удалить тег из товара
         function removeProductTag(tagName) {
             const tagsContainer = document.getElementById('product-tags-container');
             const tagElements = tagsContainer.querySelectorAll('.tag-input');
@@ -2537,7 +2693,6 @@
             });
         }
 
-        // Заполнить список доступных тегов
         function populateAvailableTags() {
             const tagSelect = document.getElementById('available-tags');
             tagSelect.innerHTML = '<option value="">Выберите тег</option>';
@@ -2550,7 +2705,6 @@
             });
         }
 
-        // Отображение товаров
         function displayProducts(products, containerId) {
             const container = document.getElementById(containerId);
             if (products.length === 0) {
@@ -2583,10 +2737,10 @@
                             ${product.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
                         </div>
                         <div class="product-actions">
-                            <button class="btn btn-primary" onclick="addToCart(${product.id})">
+                            <button class="btn btn-primary" onclick="addToCart('${product.id}')">
                                 <i class="fas fa-shopping-cart"></i> В корзину
                             </button>
-                            <button class="btn btn-secondary" onclick="openProductModal(${product.id})">
+                            <button class="btn btn-secondary" onclick="openProductModal('${product.id}')">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
@@ -2595,39 +2749,11 @@
             `).join('');
         }
 
-        // Добавление товара в корзину
-        function addToCart(productId) {
-            const product = state.products.find(p => p.id === productId);
-            if (!product) return;
-
-            const existingItem = state.cart.find(item => item.productId === productId);
-            if (existingItem) {
-                existingItem.quantity += 1;
-            } else {
-                state.cart.push({
-                    productId: productId,
-                    quantity: 1,
-                    name: product.name,
-                    price: product.price,
-                    image: product.image,
-                    emoji: product.emoji
-                });
-            }
-
-            localStorage.setItem('smileCart', JSON.stringify(state.cart));
-            updateCartCount();
-            updateCartDisplay();
-
-            showMessage(`Товар "${product.name}" добавлен в корзину!`, 'success');
-        }
-
-        // Обновление счетчика корзины
         function updateCartCount() {
             const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
             document.getElementById('cart-count').textContent = totalItems;
         }
 
-        // Обновление отображения корзины
         function updateCartDisplay() {
             const cartItemsContainer = document.getElementById('cart-items');
             const totalItemsElement = document.getElementById('total-items');
@@ -2657,10 +2783,10 @@
                         <div class="cart-item-title">${item.name}</div>
                         <div class="cart-item-price">${item.price} руб.</div>
                         <div class="cart-item-quantity">
-                            <button class="quantity-btn" onclick="updateCartItemQuantity(${item.productId}, ${item.quantity - 1})">-</button>
-                            <input type="number" class="quantity-input" value="${item.quantity}" min="1" onchange="updateCartItemQuantity(${item.productId}, parseInt(this.value))">
-                            <button class="quantity-btn" onclick="updateCartItemQuantity(${item.productId}, ${item.quantity + 1})">+</button>
-                            <button class="btn btn-secondary" style="margin-left: 1rem;" onclick="removeFromCart(${item.productId})">Удалить</button>
+                            <button class="quantity-btn" onclick="updateCartItemQuantity('${item.productId}', ${item.quantity - 1})">-</button>
+                            <input type="number" class="quantity-input" value="${item.quantity}" min="1" onchange="updateCartItemQuantity('${item.productId}', parseInt(this.value))">
+                            <button class="quantity-btn" onclick="updateCartItemQuantity('${item.productId}', ${item.quantity + 1})">+</button>
+                            <button class="btn btn-secondary" style="margin-left: 1rem;" onclick="removeFromCart('${item.productId}')">Удалить</button>
                         </div>
                     </div>
                 </div>
@@ -2674,31 +2800,6 @@
             finalPriceElement.textContent = `${totalPrice} руб.`;
         }
 
-        // Обновление количества товара в корзине
-        function updateCartItemQuantity(productId, newQuantity) {
-            if (newQuantity < 1) {
-                removeFromCart(productId);
-                return;
-            }
-
-            const item = state.cart.find(item => item.productId === productId);
-            if (item) {
-                item.quantity = newQuantity;
-                localStorage.setItem('smileCart', JSON.stringify(state.cart));
-                updateCartCount();
-                updateCartDisplay();
-            }
-        }
-
-        // Удаление товара из корзины
-        function removeFromCart(productId) {
-            state.cart = state.cart.filter(item => item.productId !== productId);
-            localStorage.setItem('smileCart', JSON.stringify(state.cart));
-            updateCartCount();
-            updateCartDisplay();
-        }
-
-        // Открытие модального окна товара
         function openProductModal(productId) {
             const product = state.products.find(p => p.id === productId);
             if (!product) return;
@@ -2709,7 +2810,6 @@
 
             title.textContent = product.name;
 
-            // Получение отзывов для этого товара
             const productReviews = state.reviews.filter(r => r.productId === productId);
             const averageRating = productReviews.length > 0 
                 ? productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length 
@@ -2738,7 +2838,7 @@
                         ${product.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
                     </div>
                     <div class="product-actions" style="margin-top: 1.5rem;">
-                        <button class="btn btn-primary" onclick="addToCart(${product.id}); document.getElementById('product-modal').classList.remove('active');">
+                        <button class="btn btn-primary" onclick="addToCart('${product.id}'); document.getElementById('product-modal').classList.remove('active');">
                             <i class="fas fa-shopping-cart"></i> В корзину
                         </button>
                     </div>
@@ -2756,14 +2856,14 @@
                                 <span class="star" data-rating="5">★</span>
                             </div>
                             <textarea id="review-text" placeholder="Ваш отзыв..." style="width: 100%; padding: 0.8rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 1rem;" rows="4"></textarea>
-                            <button class="btn btn-primary" onclick="submitReview(${product.id})">Отправить отзыв</button>
+                            <button class="btn btn-primary" onclick="submitReview('${product.id}')">Отправить отзыв</button>
                         </div>
                     ` : '<p>Войдите, чтобы оставить отзыв</p>'}
                     <div class="review-list">
                         ${productReviews.length > 0 ? productReviews.map(review => `
                             <div class="review-item">
                                 <div class="review-header">
-                                    <span class="review-author">${getUserName(review.userId)}</span>
+                                    <span class="review-author">${review.userName || 'Неизвестный'}</span>
                                     <span class="review-rating">${'★'.repeat(review.rating)}${'☆'.repeat(5-review.rating)}</span>
                                 </div>
                                 <div class="review-text">${review.text}</div>
@@ -2773,7 +2873,6 @@
                 </div>
             `;
 
-            // Настройка рейтинга звездочек
             const stars = content.querySelectorAll('.star');
             let selectedRating = 0;
             
@@ -2793,44 +2892,6 @@
             modal.classList.add('active');
         }
 
-        // Отправка отзыва
-        function submitReview(productId) {
-            if (!state.currentUser) {
-                showMessage('Войдите, чтобы оставить отзыв', 'error');
-                return;
-            }
-
-            const ratingElements = document.querySelectorAll('#review-rating .star.active');
-            const rating = ratingElements.length;
-            const text = document.getElementById('review-text').value;
-
-            if (rating === 0) {
-                showMessage('Пожалуйста, поставьте оценку', 'error');
-                return;
-            }
-
-            if (!text.trim()) {
-                showMessage('Пожалуйста, напишите отзыв', 'error');
-                return;
-            }
-
-            const newReview = {
-                id: Date.now(),
-                productId: productId,
-                userId: state.currentUser.id,
-                rating: rating,
-                text: text,
-                date: new Date().toISOString()
-            };
-
-            state.reviews.push(newReview);
-            localStorage.setItem('smileReviews', JSON.stringify(state.reviews));
-
-            showMessage('Спасибо за ваш отзыв!', 'success');
-            document.getElementById('product-modal').classList.remove('active');
-        }
-
-        // Обработка обратной связи
         function handleFeedback() {
             const name = document.getElementById('feedback-name').value;
             const email = document.getElementById('feedback-email').value;
@@ -2841,7 +2902,6 @@
             document.getElementById('feedback-form').reset();
         }
 
-        // Поиск товаров
         function performSearch() {
             const query = document.getElementById('search-input').value.toLowerCase();
             const results = state.products.filter(product => 
@@ -2854,14 +2914,12 @@
             displayProducts(results, 'featured-products');
         }
 
-        // Заполнение фильтра тегов
         function populateTagFilter() {
             const tagFilter = document.getElementById('tag-filter');
             tagFilter.innerHTML = '<option value="all">Все</option>' +
                 state.tags.map(tag => `<option value="${tag.name}">${tag.name}</option>`).join('');
         }
 
-        // Фильтрация товаров
         function filterProducts() {
             const category = document.getElementById('category-filter').value;
             const price = document.getElementById('price-filter').value;
@@ -2869,14 +2927,12 @@
 
             let filteredProducts = state.products;
 
-            // Фильтрация по категории
             if (category !== 'all') {
                 filteredProducts = filteredProducts.filter(product => 
                     product.tags.includes(category)
                 );
             }
 
-            // Фильтрация по цене
             if (price !== 'all') {
                 if (price === '0-3000') {
                     filteredProducts = filteredProducts.filter(product => product.price <= 3000);
@@ -2889,7 +2945,6 @@
                 }
             }
 
-            // Фильтрация по тегу
             if (tag !== 'all') {
                 filteredProducts = filteredProducts.filter(product => 
                     product.tags.includes(tag)
@@ -2899,7 +2954,6 @@
             displayProducts(filteredProducts, 'catalog-products');
         }
 
-        // Показать сообщение
         function showMessage(text, type) {
             const messageEl = document.createElement('div');
             messageEl.className = `message ${type}`;
@@ -2912,49 +2966,67 @@
             }, 3000);
         }
 
-        // Вспомогательные функции
         function getProductName(productId) {
             const product = state.products.find(p => p.id === productId);
             return product ? product.name : 'Неизвестный товар';
         }
 
-        function getUserName(userId) {
-            const user = state.users.find(u => u.id === userId);
-            return user ? user.name : 'Неизвестный пользователь';
+        function hideTopBanner() {
+            document.getElementById('top-banner').classList.add('hidden');
+            document.getElementById('show-banner').style.display = 'block';
+            state.bannerHidden = true;
+            localStorage.setItem('smileBannerHidden', JSON.stringify(true));
+        }
+
+        function showTopBanner() {
+            document.getElementById('top-banner').classList.remove('hidden');
+            document.getElementById('show-banner').style.display = 'none';
+            state.bannerHidden = false;
+            localStorage.setItem('smileBannerHidden', JSON.stringify(false));
         }
 
         // Функции для админ-панели
-        function editProduct(id) {
+        async function editProduct(id) {
             const product = state.products.find(p => p.id === id);
             if (product) {
                 showProductForm(product);
             }
         }
 
-        function deleteProduct(id) {
+        async function deleteProduct(id) {
             if (confirm('Вы уверены, что хотите удалить этот товар?')) {
-                state.products = state.products.filter(p => p.id !== id);
-                localStorage.setItem('smileProducts', JSON.stringify(state.products));
-                loadAdminData();
-                loadInitialData();
-                showMessage('Товар успешно удален!', 'success');
+                try {
+                    await database.ref(`products/${id}`).remove();
+                    state.products = state.products.filter(p => p.id !== id);
+                    loadAdminData();
+                    loadInitialData();
+                    showMessage('Товар успешно удален!', 'success');
+                } catch (error) {
+                    console.error('Ошибка удаления товара:', error);
+                    showMessage('Ошибка при удалении товара', 'error');
+                }
             }
         }
 
-        function editTag(id) {
+        async function editTag(id) {
             const tag = state.tags.find(t => t.id === id);
             if (tag) {
                 showTagForm(tag);
             }
         }
 
-        function deleteTag(id) {
+        async function deleteTag(id) {
             if (confirm('Вы уверены, что хотите удалить этот тег?')) {
-                state.tags = state.tags.filter(t => t.id !== id);
-                localStorage.setItem('smileTags', JSON.stringify(state.tags));
-                loadAdminData();
-                populateAvailableTags();
-                showMessage('Тег успешно удален!', 'success');
+                try {
+                    await database.ref(`tags/${id}`).remove();
+                    state.tags = state.tags.filter(t => t.id !== id);
+                    loadAdminData();
+                    populateAvailableTags();
+                    showMessage('Тег успешно удален!', 'success');
+                } catch (error) {
+                    console.error('Ошибка удаления тега:', error);
+                    showMessage('Ошибка при удалении тега', 'error');
+                }
             }
         }
 
@@ -2962,12 +3034,17 @@
             showMessage('Функция редактирования отзыва в разработке', 'success');
         }
 
-        function deleteReview(id) {
+        async function deleteReview(id) {
             if (confirm('Вы уверены, что хотите удалить этот отзыв?')) {
-                state.reviews = state.reviews.filter(r => r.id !== id);
-                localStorage.setItem('smileReviews', JSON.stringify(state.reviews));
-                loadAdminData();
-                showMessage('Отзыв успешно удален!', 'success');
+                try {
+                    await database.ref(`reviews/${id}`).remove();
+                    state.reviews = state.reviews.filter(r => r.id !== id);
+                    loadAdminData();
+                    showMessage('Отзыв успешно удален!', 'success');
+                } catch (error) {
+                    console.error('Ошибка удаления отзыва:', error);
+                    showMessage('Ошибка при удалении отзыва', 'error');
+                }
             }
         }
 
@@ -2975,18 +3052,29 @@
             showMessage('Функция редактирования пользователя в разработке', 'success');
         }
 
-        function deleteUser(id) {
+        async function deleteUser(id) {
             if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-                state.users = state.users.filter(u => u.id !== id);
-                localStorage.setItem('smileUsers', JSON.stringify(state.users));
-                loadAdminData();
-                showMessage('Пользователь успешно удален!', 'success');
+                try {
+                    await database.ref(`users/${id}`).remove();
+                    state.users = state.users.filter(u => u.id !== id);
+                    loadAdminData();
+                    showMessage('Пользователь успешно удален!', 'success');
+                } catch (error) {
+                    console.error('Ошибка удаления пользователя:', error);
+                    showMessage('Ошибка при удалении пользователя', 'error');
+                }
             }
         }
 
         // Имитация автообновления с сервера
-        setInterval(() => {
+        setInterval(async () => {
             console.log('Проверка обновлений...');
+            try {
+                await loadDataFromFirebase();
+                console.log('Данные обновлены');
+            } catch (error) {
+                console.error('Ошибка обновления данных:', error);
+            }
         }, 30000);
     </script>
 </body>
