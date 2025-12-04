@@ -1190,7 +1190,7 @@
             color: white;
             padding: 0.3rem 0.8rem;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
 
         .tag-input .remove-tag {
@@ -1705,17 +1705,16 @@
         <i class="fas fa-key"></i>
     </button>
 
-    <!-- Firebase SDK и основной код приложения -->
+    <!-- Firebase SDK (Firestore версия) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
     <script>
-        // === ВАША КОНФИГУРАЦИЯ FIREBASE (ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ!) ===
+        // === КОНФИГУРАЦИЯ FIREBASE (Firestore) ===
         const firebaseConfig = {
             apiKey: "AIzaSyBIQKhojTxsuAzWfCGOvcGr7BM-MNvtHN8",
-            authDomain: "smlp-52b36.firebaseapp.com",
-            databaseURL: "https://smlp-52b36-default-rtdb.europe-west1.firebasedatabase.app",
+            authDomain: "smlp-52b36.firebasestorage.app",
             projectId: "smlp-52b36",
             storageBucket: "smlp-52b36.firebasestorage.app",
             messagingSenderId: "447143555986",
@@ -1724,7 +1723,7 @@
 
         // === ИНИЦИАЛИЗАЦИЯ FIREBASE ===
         firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        const db = firebase.firestore(); // Firestore
         const auth = firebase.auth();
 
         const APP_CONFIG = {
@@ -1756,76 +1755,125 @@
             bannerHidden: false
         };
 
-        // === ОСНОВНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С FIREBASE ===
+        // === ОСНОВНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С FIRESTORE ===
 
         async function loadDataFromFirebase() {
+            console.log('🔍 Загружаю данные из Firestore...');
             try {
-                // Загружаем все основные данные параллельно
+                // 1. Пытаемся получить все коллекции
                 const [productsSnapshot, tagsSnapshot, reviewsSnapshot, usersSnapshot] = await Promise.all([
-                    database.ref('products').once('value'),
-                    database.ref('tags').once('value'),
-                    database.ref('reviews').once('value'),
-                    database.ref('users').once('value')
+                    db.collection('products').get(),
+                    db.collection('tags').get(),
+                    db.collection('reviews').get(),
+                    db.collection('users').get()
                 ]);
 
-                // Преобразуем данные из Firebase в массивы
-                state.products = productsSnapshot.exists() ? 
-                    Object.entries(productsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
-                
-                state.tags = tagsSnapshot.exists() ? 
-                    Object.entries(tagsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
-                
-                state.reviews = reviewsSnapshot.exists() ? 
-                    Object.entries(reviewsSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
-                
-                state.users = usersSnapshot.exists() ? 
-                    Object.entries(usersSnapshot.val()).map(([id, data]) => ({ id, ...data })) : [];
+                // 2. Преобразуем данные
+                state.products = productsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
 
-                // Если нет товаров, загружаем начальные данные
+                state.tags = tagsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                state.reviews = reviewsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                state.users = usersSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                console.log('✅ Данные загружены:');
+                console.log(`  Товары: ${state.products.length}`);
+                console.log(`  Теги: ${state.tags.length}`);
+                console.log(`  Отзывы: ${state.reviews.length}`);
+                console.log(`  Пользователи: ${state.users.length}`);
+
+                // 3. Если нет товаров - создаём демо-данные
                 if (state.products.length === 0) {
+                    console.log('📦 Создаю демо-товары...');
                     await loadDefaultProducts();
                 }
 
-                console.log('Данные успешно загружены из Firebase');
-                
+                return true;
             } catch (error) {
-                console.error('Ошибка загрузки данных из Firebase:', error);
-                // Запасной вариант: загрузка из localStorage
+                console.error('❌ Ошибка загрузки из Firestore:', error.message);
+                
+                // Показываем пользователю понятное сообщение
+                if (error.code === 'permission-denied') {
+                    showMessage('Нет доступа к базе данных. Проверьте правила Firestore.', 'error');
+                } else if (error.code === 'failed-precondition') {
+                    showMessage('Firestore не инициализирован. Обновите страницу.', 'error');
+                } else {
+                    showMessage('Ошибка загрузки данных. Проверьте подключение.', 'error');
+                }
+                
+                // Загружаем из localStorage как запасной вариант
                 loadFromLocalStorage();
+                return false;
             }
         }
 
         async function saveProductToFirebase(product) {
             try {
-                const productData = { ...product };
-                delete productData.id; // Удаляем ID из данных для записи
+                console.log('💾 Сохраняю товар в Firestore...', product);
                 
-                if (product.id && !product.id.startsWith('-')) {
-                    // Обновление существующего товара
-                    await database.ref(`products/${product.id}`).update(productData);
-                    return product.id;
+                // Копируем данные товара без id
+                const productData = { 
+                    name: product.name,
+                    price: Number(product.price),
+                    description: product.description,
+                    code: product.code,
+                    emoji: product.emoji || '',
+                    image: product.image || '',
+                    tags: product.tags || [],
+                    rating: Number(product.rating) || 4.5,
+                    reviewsCount: Number(product.reviewsCount) || 0,
+                    createdAt: product.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                let productId = product.id;
+                
+                if (productId && productId.length > 5) { // Если есть ID (не временный)
+                    // Обновляем существующий товар
+                    await db.collection('products').doc(productId).update(productData);
+                    console.log(`✅ Товар "${product.name}" обновлен (ID: ${productId})`);
                 } else {
-                    // Создание нового товара
-                    const newProductRef = await database.ref('products').push(productData);
-                    return newProductRef.key;
+                    // Создаем новый товар
+                    const docRef = await db.collection('products').add(productData);
+                    productId = docRef.id;
+                    console.log(`✅ Товар "${product.name}" создан (ID: ${productId})`);
                 }
+                
+                return productId;
             } catch (error) {
-                console.error('Ошибка сохранения товара:', error);
+                console.error('❌ Ошибка сохранения товара:', error);
                 throw error;
             }
         }
 
         async function saveTagToFirebase(tag) {
             try {
-                const tagData = { ...tag };
-                delete tagData.id;
-                
-                if (tag.id) {
-                    await database.ref(`tags/${tag.id}`).update(tagData);
+                const tagData = { 
+                    name: tag.name,
+                    count: Number(tag.count) || 0,
+                    createdAt: tag.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (tag.id && tag.id.length > 5) {
+                    await db.collection('tags').doc(tag.id).update(tagData);
                     return tag.id;
                 } else {
-                    const newTagRef = await database.ref('tags').push(tagData);
-                    return newTagRef.key;
+                    const docRef = await db.collection('tags').add(tagData);
+                    return docRef.id;
                 }
             } catch (error) {
                 console.error('Ошибка сохранения тега:', error);
@@ -1835,8 +1883,18 @@
 
         async function saveReviewToFirebase(review) {
             try {
-                const newReviewRef = await database.ref('reviews').push(review);
-                return newReviewRef.key;
+                const reviewData = {
+                    productId: review.productId,
+                    userId: review.userId,
+                    userName: review.userName || 'Аноним',
+                    rating: Number(review.rating),
+                    text: review.text,
+                    date: review.date || new Date().toISOString(),
+                    createdAt: new Date().toISOString()
+                };
+
+                const docRef = await db.collection('reviews').add(reviewData);
+                return docRef.id;
             } catch (error) {
                 console.error('Ошибка сохранения отзыва:', error);
                 throw error;
@@ -1845,12 +1903,20 @@
 
         async function saveUserToFirebase(user) {
             try {
-                if (user.id) {
-                    await database.ref(`users/${user.id}`).update(user);
-                    return user.id;
+                const userData = {
+                    name: user.name,
+                    email: user.email,
+                    role: user.role || 'user',
+                    createdAt: user.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (user.uid) {
+                    await db.collection('users').doc(user.uid).set(userData);
+                    return user.uid;
                 } else {
-                    const newUserRef = await database.ref('users').push(user);
-                    return newUserRef.key;
+                    const docRef = await db.collection('users').add(userData);
+                    return docRef.id;
                 }
             } catch (error) {
                 console.error('Ошибка сохранения пользователя:', error);
@@ -1861,10 +1927,155 @@
         async function saveCartToFirebase() {
             if (state.currentUser && state.currentUser.uid) {
                 try {
-                    await database.ref(`carts/${state.currentUser.uid}`).set(state.cart);
+                    await db.collection('carts').doc(state.currentUser.uid).set({
+                        items: state.cart,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                    console.log('✅ Корзина сохранена в Firestore');
                 } catch (error) {
-                    console.error('Ошибка сохранения корзины:', error);
+                    console.error('❌ Ошибка сохранения корзины:', error);
                 }
+            }
+        }
+
+        async function deleteProductFromFirebase(id) {
+            try {
+                await db.collection('products').doc(id).delete();
+                console.log(`🗑️ Товар ${id} удален из Firestore`);
+                return true;
+            } catch (error) {
+                console.error('Ошибка удаления товара:', error);
+                return false;
+            }
+        }
+
+        async function deleteTagFromFirebase(id) {
+            try {
+                await db.collection('tags').doc(id).delete();
+                console.log(`🗑️ Тег ${id} удален из Firestore`);
+                return true;
+            } catch (error) {
+                console.error('Ошибка удаления тега:', error);
+                return false;
+            }
+        }
+
+        async function deleteReviewFromFirebase(id) {
+            try {
+                await db.collection('reviews').doc(id).delete();
+                console.log(`🗑️ Отзыв ${id} удален из Firestore`);
+                return true;
+            } catch (error) {
+                console.error('Ошибка удаления отзыва:', error);
+                return false;
+            }
+        }
+
+        async function deleteUserFromFirebase(id) {
+            try {
+                await db.collection('users').doc(id).delete();
+                console.log(`🗑️ Пользователь ${id} удален из Firestore`);
+                return true;
+            } catch (error) {
+                console.error('Ошибка удаления пользователя:', error);
+                return false;
+            }
+        }
+
+        // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+        function loadFromLocalStorage() {
+            console.log('📂 Загружаю данные из localStorage...');
+            const savedProducts = localStorage.getItem('smileProducts');
+            const savedUsers = localStorage.getItem('smileUsers');
+            const savedReviews = localStorage.getItem('smileReviews');
+            const savedTags = localStorage.getItem('smileTags');
+            const savedCart = localStorage.getItem('smileCart');
+            const savedTheme = localStorage.getItem('smileTheme');
+
+            if (savedProducts) state.products = JSON.parse(savedProducts);
+            if (savedUsers) state.users = JSON.parse(savedUsers);
+            if (savedReviews) state.reviews = JSON.parse(savedReviews);
+            if (savedTags) state.tags = JSON.parse(savedTags);
+            if (savedCart) state.cart = JSON.parse(savedCart);
+            if (savedTheme) {
+                state.currentTheme = savedTheme;
+                document.getElementById('theme-select').value = savedTheme;
+                document.body.className = `theme-${savedTheme}`;
+            }
+            
+            console.log('✅ Данные из localStorage загружены');
+        }
+
+        async function loadDefaultProducts() {
+            console.log('🛠️ Создаю демо-данные в Firestore...');
+            
+            const defaultProducts = [
+                {
+                    name: "Chanel No. 5",
+                    price: 7500,
+                    description: "Легендарный женский аромат, созданный в 1921 году. Сочетает ноты иланг-иланга, бергамота и сандала. Идеален для вечерних выходов и особых случаев.",
+                    tags: ["women", "classic", "floral", "evening", "luxury"],
+                    code: "CHN-001",
+                    image: "",
+                    emoji: "🌹",
+                    rating: 4.8,
+                    reviewsCount: 0,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: "Dior Sauvage",
+                    price: 6800,
+                    description: "Смелый мужской аромат, воплощающий дух свободы. Ноты перца, бергамота и амбры создают мощный и притягательный образ.",
+                    tags: ["men", "fresh", "woody", "day", "popular"],
+                    code: "DIR-002",
+                    image: "",
+                    emoji: "🏔️",
+                    rating: 4.7,
+                    reviewsCount: 0,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    name: "Jo Malone Wood Sage",
+                    price: 9200,
+                    description: "Утонченный унисекс парфюм с аккордами шалфея, морской соли и грейпфрута. Свежий и элегантный аромат для повседневного использования.",
+                    tags: ["unisex", "woody", "fresh", "day", "minimalist"],
+                    code: "JML-003",
+                    image: "",
+                    emoji: "🌿",
+                    rating: 4.6,
+                    reviewsCount: 0,
+                    createdAt: new Date().toISOString()
+                }
+            ];
+
+            // Создаем демо-теги
+            const defaultTags = [
+                { name: "women", count: 1, createdAt: new Date().toISOString() },
+                { name: "men", count: 1, createdAt: new Date().toISOString() },
+                { name: "unisex", count: 1, createdAt: new Date().toISOString() },
+                { name: "classic", count: 1, createdAt: new Date().toISOString() },
+                { name: "fresh", count: 1, createdAt: new Date().toISOString() }
+            ];
+
+            try {
+                // Сохраняем теги
+                for (const tag of defaultTags) {
+                    await db.collection('tags').add(tag);
+                }
+                console.log('✅ Демо-теги созданы');
+
+                // Сохраняем товары
+                for (const product of defaultProducts) {
+                    await saveProductToFirebase(product);
+                }
+                console.log('✅ Демо-товары созданы');
+
+                // Перезагружаем данные
+                await loadDataFromFirebase();
+                
+            } catch (error) {
+                console.error('❌ Ошибка создания демо-данных:', error);
             }
         }
 
@@ -1876,12 +2087,12 @@
                     // Регистрация нового пользователя
                     userCredential = await auth.createUserWithEmailAndPassword(email, password);
                     
-                    // Сохраняем информацию о пользователе в базе данных
-                    await database.ref(`users/${userCredential.user.uid}`).set({
+                    // Сохраняем информацию о пользователе в Firestore
+                    await saveUserToFirebase({
+                        uid: userCredential.user.uid,
                         name: name,
                         email: email,
-                        role: 'user',
-                        createdAt: new Date().toISOString()
+                        role: 'user'
                     });
                     
                 } else {
@@ -1900,111 +2111,68 @@
         // === ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ===
 
         document.addEventListener('DOMContentLoaded', async function() {
-            // Настройка слушателя изменения статуса аутентификации
-            auth.onAuthStateChanged(async (user) => {
-                if (user) {
-                    // Загружаем данные пользователя из базы
-                    const userSnapshot = await database.ref(`users/${user.uid}`).once('value');
-                    const userData = userSnapshot.val();
-                    
-                    state.currentUser = {
-                        uid: user.uid,
-                        email: user.email,
-                        ...userData
-                    };
-                    
-                    // Загружаем корзину пользователя
-                    const cartSnapshot = await database.ref(`carts/${user.uid}`).once('value');
-                    state.cart = cartSnapshot.exists() ? Object.values(cartSnapshot.val()) : [];
-                    
-                    updateCartDisplay();
-                } else {
-                    state.currentUser = null;
-                    state.cart = [];
-                }
-                
-                updateAuthButton();
-            });
-
-            // Загружаем основные данные
-            await loadDataFromFirebase();
+            console.log('🚀 Запускаю инициализацию...');
             
-            // Настраиваем обработчики событий и интерфейс
-            setupEventListeners();
-            loadInitialData();
-            updateUI();
+            try {
+                // Тестируем подключение к Firestore
+                console.log('🔌 Тестирую подключение к Firestore...');
+                await db.collection('test').doc('connection').set({
+                    test: 'Проверка подключения',
+                    timestamp: new Date().toISOString()
+                });
+                console.log('✅ Firestore подключен!');
+                
+                // Загружаем данные
+                await loadDataFromFirebase();
+                
+                // Настраиваем аутентификацию
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        // Загружаем данные пользователя из Firestore
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        const userData = userDoc.exists ? userDoc.data() : {};
+                        
+                        state.currentUser = {
+                            uid: user.uid,
+                            email: user.email,
+                            ...userData
+                        };
+                        
+                        // Загружаем корзину пользователя из Firestore
+                        const cartDoc = await db.collection('carts').doc(user.uid).get();
+                        state.cart = cartDoc.exists ? cartDoc.data().items || [] : [];
+                        
+                        updateCartDisplay();
+                        console.log(`👤 Пользователь вошел: ${user.email}`);
+                    } else {
+                        state.currentUser = null;
+                        state.cart = [];
+                        console.log('👤 Пользователь вышел');
+                    }
+                    
+                    updateAuthButton();
+                });
+                
+                // Настраиваем интерфейс
+                setupEventListeners();
+                loadInitialData();
+                updateUI();
+                
+                console.log('✨ Приложение инициализировано!');
+                
+            } catch (error) {
+                console.error('💥 Критическая ошибка инициализации:', error);
+                showMessage('Ошибка подключения к базе данных. Используется локальное хранилище.', 'warning');
+                
+                // Используем localStorage как запасной вариант
+                loadFromLocalStorage();
+                setupEventListeners();
+                loadInitialData();
+                updateUI();
+            }
         });
 
-        // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-
-        function loadFromLocalStorage() {
-            // Запасной вариант: загрузка из localStorage
-            const savedProducts = localStorage.getItem('smileProducts');
-            const savedUsers = localStorage.getItem('smileUsers');
-            const savedReviews = localStorage.getItem('smileReviews');
-            const savedTags = localStorage.getItem('smileTags');
-            const savedCart = localStorage.getItem('smileCart');
-            const savedTheme = localStorage.getItem('smileTheme');
-
-            if (savedProducts) state.products = JSON.parse(savedProducts);
-            if (savedUsers) state.users = JSON.parse(savedUsers);
-            if (savedReviews) state.reviews = JSON.parse(savedReviews);
-            if (savedTags) state.tags = JSON.parse(savedTags);
-            if (savedCart) state.cart = JSON.parse(savedCart);
-            if (savedTheme) {
-                state.currentTheme = savedTheme;
-                document.getElementById('theme-select').value = savedTheme;
-                document.body.className = `theme-${savedTheme}`;
-            }
-        }
-
-        async function loadDefaultProducts() {
-            const defaultProducts = [
-                {
-                    name: "Chanel No. 5",
-                    price: 7500,
-                    description: "Легендарный женский аромат, созданный в 1921 году. Сочетает ноты иланг-иланга, бергамота и сандала. Идеален для вечерних выходов и особых случаев.",
-                    tags: ["women", "classic", "floral", "evening", "luxury"],
-                    code: "CHN-001",
-                    image: "",
-                    emoji: "🌹",
-                    rating: 4.8,
-                    reviewsCount: 0
-                },
-                {
-                    name: "Dior Sauvage",
-                    price: 6800,
-                    description: "Смелый мужской аромат, воплощающий дух свободы. Ноты перца, бергамота и амбры создают мощный и притягательный образ.",
-                    tags: ["men", "fresh", "woody", "day", "popular"],
-                    code: "DIR-002",
-                    image: "",
-                    emoji: "🏔️",
-                    rating: 4.7,
-                    reviewsCount: 0
-                },
-                {
-                    name: "Jo Malone Wood Sage",
-                    price: 9200,
-                    description: "Утонченный унисекс парфюм с аккордами шалфея, морской соли и грейпфрута. Свежий и элегантный аромат для повседневного использования.",
-                    tags: ["unisex", "woody", "fresh", "day", "minimalist"],
-                    code: "JML-003",
-                    image: "",
-                    emoji: "🌿",
-                    rating: 4.6,
-                    reviewsCount: 0
-                }
-            ];
-
-            // Сохраняем каждый продукт в Firebase
-            for (const product of defaultProducts) {
-                await saveProductToFirebase(product);
-            }
-            
-            // Перезагружаем данные
-            await loadDataFromFirebase();
-        }
-
-        // === ОСНОВНЫЕ ФУНКЦИИ ПРИЛОЖЕНИЯ (ОБНОВЛЕННЫЕ ДЛЯ FIREBASE) ===
+        // === ОСНОВНЫЕ ФУНКЦИИ ПРИЛОЖЕНИЯ ===
 
         async function addToCart(productId) {
             const product = state.products.find(p => p.id === productId);
@@ -2120,6 +2288,7 @@
             });
             
             const productData = {
+                id: id || null,
                 name,
                 price,
                 description,
@@ -2133,10 +2302,7 @@
             
             try {
                 // Сохраняем в Firebase
-                const productId = await saveProductToFirebase({
-                    ...productData,
-                    id: id || null
-                });
+                const productId = await saveProductToFirebase(productData);
                 
                 // Обновляем локальное состояние
                 if (state.editingProduct) {
@@ -2157,6 +2323,44 @@
             } catch (error) {
                 console.error('Ошибка сохранения товара:', error);
                 showMessage('Ошибка при сохранении товара', 'error');
+            }
+        }
+
+        async function saveTag() {
+            const id = document.getElementById('tag-id').value;
+            const name = document.getElementById('tag-name').value;
+            
+            try {
+                let tagId;
+                if (state.editingTag) {
+                    tagId = await saveTagToFirebase({
+                        id: id,
+                        name: name,
+                        count: state.editingTag.count || 0
+                    });
+                    
+                    const index = state.tags.findIndex(t => t.id === state.editingTag.id);
+                    if (index !== -1) {
+                        state.tags[index].name = name;
+                    }
+                } else {
+                    const newTag = {
+                        name: name,
+                        count: 0
+                    };
+                    
+                    tagId = await saveTagToFirebase(newTag);
+                    state.tags.push({ ...newTag, id: tagId });
+                }
+                
+                loadAdminData();
+                populateAvailableTags();
+                hideTagForm();
+                showMessage('Тег успешно сохранен!', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка сохранения тега:', error);
+                showMessage('Ошибка при сохранении тега', 'error');
             }
         }
 
@@ -2211,7 +2415,7 @@
                 }
             });
 
-            // Форма аутентификации (обновленная для Firebase)
+            // Форма аутентификации
             document.getElementById('auth-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
@@ -2238,7 +2442,7 @@
                         
                         // Проверка админского ключа
                         if (adminKey && validateAdminKey(adminKey)) {
-                            await database.ref(`users/${user.uid}/role`).set('admin');
+                            await db.collection('users').doc(user.uid).update({ role: 'admin' });
                             state.currentUser.role = 'admin';
                         }
                         
@@ -2325,7 +2529,7 @@
             });
         }
 
-        // Выход из системы (обновленный для Firebase)
+        // Выход из системы
         async function logout() {
             try {
                 await auth.signOut();
@@ -2339,10 +2543,6 @@
                 showMessage('Ошибка при выходе из системы', 'error');
             }
         }
-
-        // ... (остальные функции из вашего исходного кода остаются без изменений)
-
-        // === НАЧАЛО ВАШЕГО ИСХОДНОГО КОДА (с минимальными изменениями) ===
 
         function initializeApp() {
             // Загрузка данных из localStorage (запасной вариант)
@@ -2611,44 +2811,6 @@
             document.getElementById('tag-id').value = tag.id;
             document.getElementById('tag-name').value = tag.name;
             state.editingTag = tag;
-        }
-
-        async function saveTag() {
-            const id = document.getElementById('tag-id').value;
-            const name = document.getElementById('tag-name').value;
-            
-            try {
-                let tagId;
-                if (state.editingTag) {
-                    tagId = await saveTagToFirebase({
-                        id: id,
-                        name: name,
-                        count: state.editingTag.count || 0
-                    });
-                    
-                    const index = state.tags.findIndex(t => t.id === state.editingTag.id);
-                    if (index !== -1) {
-                        state.tags[index].name = name;
-                    }
-                } else {
-                    const newTag = {
-                        name: name,
-                        count: 0
-                    };
-                    
-                    tagId = await saveTagToFirebase(newTag);
-                    state.tags.push({ ...newTag, id: tagId });
-                }
-                
-                loadAdminData();
-                populateAvailableTags();
-                hideTagForm();
-                showMessage('Тег успешно сохранен!', 'success');
-                
-            } catch (error) {
-                console.error('Ошибка сохранения тега:', error);
-                showMessage('Ошибка при сохранении тега', 'error');
-            }
         }
 
         function addTagToProduct() {
@@ -2995,14 +3157,13 @@
 
         async function deleteProduct(id) {
             if (confirm('Вы уверены, что хотите удалить этот товар?')) {
-                try {
-                    await database.ref(`products/${id}`).remove();
+                const success = await deleteProductFromFirebase(id);
+                if (success) {
                     state.products = state.products.filter(p => p.id !== id);
                     loadAdminData();
                     loadInitialData();
                     showMessage('Товар успешно удален!', 'success');
-                } catch (error) {
-                    console.error('Ошибка удаления товара:', error);
+                } else {
                     showMessage('Ошибка при удалении товара', 'error');
                 }
             }
@@ -3017,14 +3178,13 @@
 
         async function deleteTag(id) {
             if (confirm('Вы уверены, что хотите удалить этот тег?')) {
-                try {
-                    await database.ref(`tags/${id}`).remove();
+                const success = await deleteTagFromFirebase(id);
+                if (success) {
                     state.tags = state.tags.filter(t => t.id !== id);
                     loadAdminData();
                     populateAvailableTags();
                     showMessage('Тег успешно удален!', 'success');
-                } catch (error) {
-                    console.error('Ошибка удаления тега:', error);
+                } else {
                     showMessage('Ошибка при удалении тега', 'error');
                 }
             }
@@ -3036,13 +3196,12 @@
 
         async function deleteReview(id) {
             if (confirm('Вы уверены, что хотите удалить этот отзыв?')) {
-                try {
-                    await database.ref(`reviews/${id}`).remove();
+                const success = await deleteReviewFromFirebase(id);
+                if (success) {
                     state.reviews = state.reviews.filter(r => r.id !== id);
                     loadAdminData();
                     showMessage('Отзыв успешно удален!', 'success');
-                } catch (error) {
-                    console.error('Ошибка удаления отзыва:', error);
+                } else {
                     showMessage('Ошибка при удалении отзыва', 'error');
                 }
             }
@@ -3054,13 +3213,12 @@
 
         async function deleteUser(id) {
             if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-                try {
-                    await database.ref(`users/${id}`).remove();
+                const success = await deleteUserFromFirebase(id);
+                if (success) {
                     state.users = state.users.filter(u => u.id !== id);
                     loadAdminData();
                     showMessage('Пользователь успешно удален!', 'success');
-                } catch (error) {
-                    console.error('Ошибка удаления пользователя:', error);
+                } else {
                     showMessage('Ошибка при удалении пользователя', 'error');
                 }
             }
@@ -3068,12 +3226,12 @@
 
         // Имитация автообновления с сервера
         setInterval(async () => {
-            console.log('Проверка обновлений...');
+            console.log('🔄 Проверка обновлений...');
             try {
                 await loadDataFromFirebase();
-                console.log('Данные обновлены');
+                console.log('✅ Данные обновлены');
             } catch (error) {
-                console.error('Ошибка обновления данных:', error);
+                console.error('❌ Ошибка обновления данных:', error);
             }
         }, 30000);
     </script>
