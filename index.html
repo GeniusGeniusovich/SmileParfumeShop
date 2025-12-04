@@ -1260,6 +1260,79 @@
         .theme-dark .product-code {
             color: #CCCCCC !important;
         }
+
+        /* Анимации для уведомлений */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .points-notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 300px;
+        }
+
+        /* Уровни пользователей */
+        .level-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .level-novice {
+            background: #6c757d;
+            color: white;
+        }
+
+        .level-regular {
+            background: #007bff;
+            color: white;
+        }
+
+        .level-vip {
+            background: #6f42c1;
+            color: white;
+        }
+
+        .level-premium {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: #212529;
+        }
+
+        /* Адаптивность для мобильных */
+        @media (max-width: 768px) {
+            .points-summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .points-section > div {
+                grid-template-columns: 1fr;
+            }
+            
+            .exchange-section .exchange-options {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .exchange-section .exchange-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .points-notification {
+                max-width: calc(100% - 40px);
+            }
+        }
     </style>
 </head>
 <body class="theme-classic">
@@ -1304,6 +1377,10 @@
                         <li><a href="#" class="nav-link active" data-tab="home"><i class="fas fa-home"></i> Главная</a></li>
                         <li><a href="#" class="nav-link" data-tab="catalog"><i class="fas fa-store"></i> Каталог</a></li>
                         <li><a href="#" class="nav-link" data-tab="cart"><i class="fas fa-shopping-cart"></i> Корзина <span id="cart-count">0</span></a></li>
+                        <li><a href="#" class="nav-link" data-tab="points">
+                            <i class="fas fa-coins"></i> Баллы 
+                            <span id="points-badge" style="margin-left: 5px; background: var(--accent); color: var(--primary); padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; display: none;">0</span>
+                        </a></li>
                         <li><a href="#" class="nav-link" data-tab="about"><i class="fas fa-info-circle"></i> О нас</a></li>
                         <li><a href="#" class="nav-link" data-tab="contact"><i class="fas fa-envelope"></i> Контакты</a></li>
                     </ul>
@@ -1397,13 +1474,99 @@
                     <span>Общая стоимость:</span>
                     <span id="total-price">0 руб.</span>
                 </div>
+                <div class="summary-row">
+                    <span>Скидка по баллам:</span>
+                    <span id="points-discount">0 руб.</span>
+                </div>
                 <div class="summary-row summary-total">
                     <span>Итого:</span>
                     <span id="final-price">0 руб.</span>
                 </div>
-                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" id="checkout-btn">
                     <i class="fas fa-credit-card"></i> Оформить заказ
                 </button>
+            </div>
+        </section>
+
+        <!-- Баллы -->
+        <section id="points" class="tab-content">
+            <div class="container">
+                <h2><i class="fas fa-coins"></i> Мои баллы</h2>
+                
+                <!-- Статистика баллов -->
+                <div class="points-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <div class="points-card" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem; border-radius: 12px;">
+                        <h3 style="color: white; margin-bottom: 0.5rem;">Текущий баланс</h3>
+                        <div style="font-size: 2.5rem; font-weight: bold;" id="current-balance">0</div>
+                        <div style="opacity: 0.9;" id="user-level">Новичок</div>
+                    </div>
+                    
+                    <div class="points-card" style="background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 0.5rem;">Всего заработано</h3>
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--accent);" id="total-earned">0</div>
+                        <div style="color: var(--text-light); font-size: 0.9rem;" id="next-level-info"></div>
+                    </div>
+                    
+                    <div class="points-card" style="background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 0.5rem;">Ближайшая награда</h3>
+                        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                            <div style="flex: 1; background: var(--background); height: 10px; border-radius: 5px; margin-right: 1rem;">
+                                <div id="reward-progress" style="background: var(--accent); height: 100%; border-radius: 5px; width: 0%;"></div>
+                            </div>
+                            <span id="reward-percent">0%</span>
+                        </div>
+                        <div id="next-reward" style="color: var(--text-light);">100 баллов = 10₽ скидки</div>
+                    </div>
+                </div>
+                
+                <!-- Промокоды и операции -->
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; margin-bottom: 2rem;">
+                    <!-- Левая колонка: промокоды -->
+                    <div class="promo-section" style="background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 1rem;"><i class="fas fa-gift"></i> Активировать промокод</h3>
+                        <div class="input-group" style="display: flex; margin-bottom: 1rem;">
+                            <input type="text" id="promo-code" placeholder="Введите промокод" style="flex: 1; padding: 0.8rem; border: 1px solid var(--border); border-radius: 8px 0 0 8px; background: var(--card-bg); color: var(--text);">
+                            <button id="apply-promo" style="background: var(--accent); color: var(--primary); border: none; padding: 0 1.5rem; border-radius: 0 8px 8px 0; cursor: pointer; font-weight: bold;">Применить</button>
+                        </div>
+                        <div id="active-promos" style="margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">Активные промокоды</h4>
+                            <div id="promo-list"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Правая колонка: история -->
+                    <div class="history-section" style="background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 1rem;"><i class="fas fa-history"></i> История операций</h3>
+                        <div id="points-history" style="max-height: 400px; overflow-y: auto;">
+                            <!-- История будет загружена через JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Обмен баллов на скидки -->
+                <div class="exchange-section" style="background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                    <h3 style="margin-bottom: 1rem;"><i class="fas fa-exchange-alt"></i> Обмен баллов</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-light);">Обменяйте баллы на скидку для следующего заказа</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;" id="exchange-options">
+                        <div class="exchange-option" style="text-align: center; padding: 1rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer;" data-points="100" data-discount="10">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">100 баллов</div>
+                            <div style="color: var(--text-light);">= 10₽ скидки</div>
+                        </div>
+                        <div class="exchange-option" style="text-align: center; padding: 1rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer;" data-points="500" data-discount="60">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">500 баллов</div>
+                            <div style="color: var(--text-light);">= 60₽ скидки</div>
+                        </div>
+                        <div class="exchange-option" style="text-align: center; padding: 1rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer;" data-points="1000" data-discount="150">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">1000 баллов</div>
+                            <div style="color: var(--text-light);">= 150₽ скидки</div>
+                        </div>
+                        <div class="exchange-option" style="text-align: center; padding: 1rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer;" data-points="5000" data-discount="1000">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">5000 баллов</div>
+                            <div style="color: var(--text-light);">= 1000₽ скидки</div>
+                        </div>
+                    </div>
+                    <div id="exchange-status" style="margin-top: 1rem; text-align: center;"></div>
+                </div>
             </div>
         </section>
 
@@ -1565,6 +1728,7 @@
                     <div class="admin-tab" data-admin-tab="tags">Теги</div>
                     <div class="admin-tab" data-admin-tab="reviews">Отзывы</div>
                     <div class="admin-tab" data-admin-tab="users">Пользователи</div>
+                    <div class="admin-tab" data-admin-tab="points">Баллы пользователей</div>
                 </div>
                 <div id="admin-products" class="admin-content active">
                     <button class="btn btn-primary" id="add-product-btn">
@@ -1696,6 +1860,125 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="admin-points" class="admin-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3><i class="fas fa-coins"></i> Управление баллами</h3>
+                        <button class="btn btn-primary" id="create-promo-btn">
+                            <i class="fas fa-plus"></i> Создать промокод
+                        </button>
+                    </div>
+                    
+                    <!-- Форма создания промокода -->
+                    <div id="promo-form-container" class="product-form" style="display: none; margin-bottom: 2rem;">
+                        <h3 id="promo-form-title">Создать промокод</h3>
+                        <form id="promo-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="promo-code-input">Код промокода</label>
+                                    <input type="text" id="promo-code-input" required style="text-transform: uppercase;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="promo-points">Количество баллов</label>
+                                    <input type="number" id="promo-points" min="1" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="promo-expires">Срок действия</label>
+                                    <input type="date" id="promo-expires">
+                                </div>
+                                <div class="form-group">
+                                    <label for="promo-max-uses">Максимум использований</label>
+                                    <input type="number" id="promo-max-uses" min="1" value="100">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <button type="submit" class="btn btn-primary">Создать промокод</button>
+                                <button type="button" class="btn btn-secondary" id="cancel-promo-btn">Отмена</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Панель управления баллами пользователей -->
+                    <div class="admin-panel" style="margin-bottom: 2rem;">
+                        <h4>Начисление/списание баллов</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="points-user-select">Пользователь</label>
+                                <select id="points-user-select" style="width: 100%;">
+                                    <option value="">Выберите пользователя</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="points-amount">Количество баллов</label>
+                                <input type="number" id="points-amount" placeholder="Положительное - начислить, отрицательное - списать">
+                            </div>
+                            <div class="form-group">
+                                <label for="points-reason">Причина</label>
+                                <input type="text" id="points-reason" placeholder="Описание операции">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="apply-points-btn">
+                            <i class="fas fa-check"></i> Применить
+                        </button>
+                    </div>
+                    
+                    <!-- Таблица пользователей с баллами -->
+                    <h4>Пользователи и их баллы</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Email</th>
+                                <th>Баланс</th>
+                                <th>Всего заработано</th>
+                                <th>Уровень</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-points-table">
+                            <!-- Данные загружаются через JS -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- Таблица промокодов -->
+                    <h4 style="margin-top: 2rem;">Промокоды</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Код</th>
+                                <th>Баллы</th>
+                                <th>Использований</th>
+                                <th>Срок действия</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-promocodes-table">
+                            <!-- Данные загружаются через JS -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- История операций -->
+                    <h4 style="margin-top: 2rem;">История операций</h4>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Пользователь</th>
+                                    <th>Изменение</th>
+                                    <th>Тип</th>
+                                    <th>Описание</th>
+                                    <th>Баланс после</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-points-history">
+                                <!-- Данные загружаются через JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1719,6 +2002,21 @@
             storageBucket: "smlp-52b36.firebasestorage.app",
             messagingSenderId: "447143555986",
             appId: "1:447143555986:web:a574521348d533c6bc074b"
+        };
+
+        // === КОНФИГУРАЦИЯ БАЛЛОВ ===
+        const POINTS_CONFIG = {
+            REGISTRATION_BONUS: 100,
+            REVIEW_BONUS: 5,
+            PURCHASE_PERCENT: 0.01, // 1% от суммы заказа
+            LEVELS: {
+                novice: { min: 0, name: "Новичок" },
+                regular: { min: 500, name: "Постоянный клиент" },
+                vip: { min: 2000, name: "VIP клиент" },
+                premium: { min: 5000, name: "Премиум клиент" }
+            },
+            EXCHANGE_RATE: 10, // 10 баллов = 1 рубль
+            MONTHLY_BONUS: 50 // Ежемесячный бонус за активность
         };
 
         // === ИНИЦИАЛИЗАЦИЯ FIREBASE ===
@@ -1749,10 +2047,14 @@
             tags: [],
             reviews: [],
             users: [],
+            promoCodes: [],
+            userPoints: null,
+            pointsHistory: [],
             currentTheme: 'classic',
             editingProduct: null,
             editingTag: null,
-            bannerHidden: false
+            bannerHidden: false,
+            activeDiscount: null
         };
 
         // === ОСНОВНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С FIRESTORE ===
@@ -1761,11 +2063,12 @@
             console.log('🔍 Загружаю данные из Firestore...');
             try {
                 // 1. Пытаемся получить все коллекции
-                const [productsSnapshot, tagsSnapshot, reviewsSnapshot, usersSnapshot] = await Promise.all([
+                const [productsSnapshot, tagsSnapshot, reviewsSnapshot, usersSnapshot, promoCodesSnapshot] = await Promise.all([
                     db.collection('products').get(),
                     db.collection('tags').get(),
                     db.collection('reviews').get(),
-                    db.collection('users').get()
+                    db.collection('users').get(),
+                    db.collection('promoCodes').get()
                 ]);
 
                 // 2. Преобразуем данные
@@ -1789,11 +2092,17 @@
                     ...doc.data()
                 }));
 
+                state.promoCodes = promoCodesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
                 console.log('✅ Данные загружены:');
                 console.log(`  Товары: ${state.products.length}`);
                 console.log(`  Теги: ${state.tags.length}`);
                 console.log(`  Отзывы: ${state.reviews.length}`);
                 console.log(`  Пользователи: ${state.users.length}`);
+                console.log(`  Промокоды: ${state.promoCodes.length}`);
 
                 // 3. Если нет товаров - создаём демо-данные
                 if (state.products.length === 0) {
@@ -1982,6 +2291,651 @@
             }
         }
 
+        // === ФУНКЦИИ ДЛЯ СИСТЕМЫ БАЛЛОВ ===
+
+        // Инициализация баллов пользователя при регистрации
+        async function initializeUserPoints(userId, userName) {
+            try {
+                const pointsData = {
+                    userId: userId,
+                    balance: POINTS_CONFIG.REGISTRATION_BONUS,
+                    totalEarned: POINTS_CONFIG.REGISTRATION_BONUS,
+                    lastActivity: new Date().toISOString(),
+                    level: "novice",
+                    registrationBonus: true
+                };
+                
+                await db.collection('userPoints').doc(userId).set(pointsData);
+                
+                // Записываем в историю
+                await addPointsHistory(userId, POINTS_CONFIG.REGISTRATION_BONUS, 'registration', 
+                    `Бонус за регистрацию: ${userName}`);
+                
+                console.log(`✅ Начислено ${POINTS_CONFIG.REGISTRATION_BONUS} баллов новому пользователю`);
+                return pointsData;
+            } catch (error) {
+                console.error('❌ Ошибка инициализации баллов:', error);
+                return null;
+            }
+        }
+
+        // Добавление записи в историю
+        async function addPointsHistory(userId, amount, type, description, orderId = null, productId = null) {
+            try {
+                // Получаем текущий баланс
+                const userPointsRef = db.collection('userPoints').doc(userId);
+                const doc = await userPointsRef.get();
+                
+                let balanceAfter = amount;
+                if (doc.exists) {
+                    const currentData = doc.data();
+                    balanceAfter = currentData.balance + amount;
+                }
+                
+                const historyData = {
+                    userId: userId,
+                    date: new Date().toISOString(),
+                    amount: amount,
+                    type: type,
+                    description: description,
+                    orderId: orderId,
+                    productId: productId,
+                    balanceAfter: balanceAfter
+                };
+                
+                if (state.currentUser && state.currentUser.role === 'admin') {
+                    historyData.adminId = state.currentUser.uid;
+                }
+                
+                const historyRef = await db.collection('pointsHistory').add(historyData);
+                console.log(`✅ Запись добавлена в историю: ${type}, ${amount} баллов`);
+                return historyRef.id;
+            } catch (error) {
+                console.error('❌ Ошибка добавления истории:', error);
+                return null;
+            }
+        }
+
+        // Начисление баллов
+        async function addPoints(userId, amount, type, description, orderId = null, productId = null) {
+            try {
+                const userPointsRef = db.collection('userPoints').doc(userId);
+                
+                // Используем транзакцию для атомарности
+                await db.runTransaction(async (transaction) => {
+                    const doc = await transaction.get(userPointsRef);
+                    
+                    if (!doc.exists) {
+                        // Создаем запись, если не существует
+                        const newData = {
+                            userId: userId,
+                            balance: amount,
+                            totalEarned: amount > 0 ? amount : 0,
+                            lastActivity: new Date().toISOString(),
+                            level: "novice",
+                            registrationBonus: false
+                        };
+                        transaction.set(userPointsRef, newData);
+                    } else {
+                        const currentData = doc.data();
+                        const newBalance = currentData.balance + amount;
+                        const newTotalEarned = currentData.totalEarned + (amount > 0 ? amount : 0);
+                        
+                        // Определяем уровень
+                        let newLevel = "novice";
+                        if (newTotalEarned >= POINTS_CONFIG.LEVELS.premium.min) {
+                            newLevel = "premium";
+                        } else if (newTotalEarned >= POINTS_CONFIG.LEVELS.vip.min) {
+                            newLevel = "vip";
+                        } else if (newTotalEarned >= POINTS_CONFIG.LEVELS.regular.min) {
+                            newLevel = "regular";
+                        }
+                        
+                        transaction.update(userPointsRef, {
+                            balance: newBalance,
+                            totalEarned: newTotalEarned,
+                            lastActivity: new Date().toISOString(),
+                            level: newLevel
+                        });
+                    }
+                });
+                
+                // Добавляем в историю
+                await addPointsHistory(userId, amount, type, description, orderId, productId);
+                
+                // Обновляем UI если это текущий пользователь
+                if (userId === state.currentUser?.uid) {
+                    await updatePointsDisplay();
+                }
+                
+                // Показываем уведомление
+                if (amount > 0 && userId === state.currentUser?.uid) {
+                    showPointsNotification(amount, description);
+                }
+                
+                console.log(`✅ Начислено ${amount} баллов пользователю ${userId}`);
+                return true;
+            } catch (error) {
+                console.error('❌ Ошибка начисления баллов:', error);
+                return false;
+            }
+        }
+
+        // Получение информации о баллах пользователя
+        async function getUserPoints(userId) {
+            try {
+                const doc = await db.collection('userPoints').doc(userId).get();
+                if (doc.exists) {
+                    return { id: doc.id, ...doc.data() };
+                } else {
+                    return null;
+                }
+            } catch (error) {
+                console.error('❌ Ошибка получения баллов:', error);
+                return null;
+            }
+        }
+
+        // Загрузка истории баллов
+        async function loadPointsHistory(userId, limit = 20) {
+            try {
+                const snapshot = await db.collection('pointsHistory')
+                    .where('userId', '==', userId)
+                    .orderBy('date', 'desc')
+                    .limit(limit)
+                    .get();
+                
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+                console.error('❌ Ошибка загрузки истории:', error);
+                return [];
+            }
+        }
+
+        // Обновление отображения баллов
+        async function updatePointsDisplay() {
+            if (!state.currentUser) return;
+            
+            const pointsData = await getUserPoints(state.currentUser.uid);
+            if (!pointsData) {
+                // Создаем запись, если её нет
+                await initializeUserPoints(state.currentUser.uid, state.currentUser.name || state.currentUser.email);
+                state.userPoints = await getUserPoints(state.currentUser.uid);
+            } else {
+                state.userPoints = pointsData;
+            }
+            
+            if (!state.userPoints) return;
+            
+            // Обновляем цифры
+            document.getElementById('current-balance').textContent = state.userPoints.balance;
+            document.getElementById('total-earned').textContent = state.userPoints.totalEarned;
+            document.getElementById('user-level').textContent = POINTS_CONFIG.LEVELS[state.userPoints.level]?.name || state.userPoints.level;
+            
+            // Обновляем бейдж в навигации
+            const badge = document.getElementById('points-badge');
+            if (state.userPoints.balance > 0) {
+                badge.textContent = state.userPoints.balance;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+            
+            // Обновляем прогресс
+            const nextLevel = getNextLevel(state.userPoints.totalEarned);
+            if (nextLevel) {
+                const progress = ((state.userPoints.totalEarned - getCurrentLevelMin(state.userPoints.totalEarned)) / 
+                                (nextLevel.min - getCurrentLevelMin(state.userPoints.totalEarned))) * 100;
+                
+                document.getElementById('reward-progress').style.width = `${progress}%`;
+                document.getElementById('reward-percent').textContent = `${Math.round(progress)}%`;
+                document.getElementById('next-level-info').textContent = 
+                    `До уровня ${nextLevel.name}: ${nextLevel.min - state.userPoints.totalEarned} баллов`;
+            }
+            
+            // Загружаем историю
+            await loadUserPointsHistory();
+            
+            // Проверяем ежемесячный бонус
+            await checkMonthlyBonus(state.currentUser.uid);
+        }
+
+        // Загрузка истории для пользователя
+        async function loadUserPointsHistory() {
+            if (!state.currentUser) return;
+            
+            const history = await loadPointsHistory(state.currentUser.uid, 10);
+            state.pointsHistory = history;
+            const historyContainer = document.getElementById('points-history');
+            
+            if (history.length === 0) {
+                historyContainer.innerHTML = '<p style="text-align: center; color: var(--text-light);">Нет операций с баллами</p>';
+                return;
+            }
+            
+            historyContainer.innerHTML = history.map(item => `
+                <div style="display: flex; justify-content: space-between; padding: 0.8rem; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <div style="font-weight: bold;">${item.description}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">
+                            ${new Date(item.date).toLocaleDateString()} ${new Date(item.date).toLocaleTimeString()}
+                        </div>
+                    </div>
+                    <div style="font-weight: bold; color: ${item.amount > 0 ? 'green' : 'red'};">
+                        ${item.amount > 0 ? '+' : ''}${item.amount}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Вспомогательные функции для уровней
+        function getNextLevel(totalPoints) {
+            const levels = Object.entries(POINTS_CONFIG.LEVELS)
+                .sort((a, b) => a[1].min - b[1].min);
+            
+            for (let i = 0; i < levels.length - 1; i++) {
+                if (totalPoints >= levels[i][1].min && totalPoints < levels[i + 1][1].min) {
+                    return levels[i + 1][1];
+                }
+            }
+            return null;
+        }
+
+        function getCurrentLevelMin(totalPoints) {
+            const levels = Object.entries(POINTS_CONFIG.LEVELS)
+                .sort((a, b) => a[1].min - b[1].min);
+            
+            for (let i = levels.length - 1; i >= 0; i--) {
+                if (totalPoints >= levels[i][1].min) {
+                    return levels[i][1].min;
+                }
+            }
+            return 0;
+        }
+
+        // Проверка ежемесячного бонуса
+        async function checkMonthlyBonus(userId) {
+            const pointsData = await getUserPoints(userId);
+            if (!pointsData) return;
+            
+            const lastActivity = new Date(pointsData.lastActivity);
+            const now = new Date();
+            
+            // Если прошло больше месяца с последней активности
+            if ((now - lastActivity) > 30 * 24 * 60 * 60 * 1000) {
+                await addPoints(userId, POINTS_CONFIG.MONTHLY_BONUS, 'monthly', 
+                    'Ежемесячный бонус за активность');
+            }
+        }
+
+        // Активация промокода
+        async function applyPromoCode() {
+            if (!state.currentUser) {
+                showMessage('Войдите в систему для активации промокода', 'error');
+                return;
+            }
+            
+            const code = document.getElementById('promo-code').value.trim().toUpperCase();
+            if (!code) {
+                showMessage('Введите промокод', 'error');
+                return;
+            }
+            
+            try {
+                const snapshot = await db.collection('promoCodes').where('code', '==', code).get();
+                if (snapshot.empty) {
+                    showMessage('Промокод не найден', 'error');
+                    return;
+                }
+                
+                const promoDoc = snapshot.docs[0];
+                const promoData = promoDoc.data();
+                
+                // Проверяем активность
+                if (!promoData.active) {
+                    showMessage('Промокод неактивен', 'error');
+                    return;
+                }
+                
+                // Проверяем срок действия
+                if (promoData.expires && new Date(promoData.expires) < new Date()) {
+                    showMessage('Срок действия промокода истёк', 'error');
+                    return;
+                }
+                
+                // Проверяем количество использований
+                if (promoData.maxUses && promoData.usedBy && promoData.usedBy.length >= promoData.maxUses) {
+                    showMessage('Промокод использован максимальное количество раз', 'error');
+                    return;
+                }
+                
+                // Проверяем, не использовал ли уже этот пользователь
+                if (promoData.usedBy && promoData.usedBy.includes(state.currentUser.uid)) {
+                    showMessage('Вы уже использовали этот промокод', 'error');
+                    return;
+                }
+                
+                // Начисляем баллы
+                const success = await addPoints(state.currentUser.uid, promoData.points, 'promo', 
+                    `Активация промокода: ${code}`);
+                
+                if (success) {
+                    // Добавляем пользователя в список использовавших
+                    await db.collection('promoCodes').doc(promoDoc.id).update({
+                        usedBy: firebase.firestore.FieldValue.arrayUnion(state.currentUser.uid)
+                    });
+                    
+                    showMessage(`Промокод активирован! Начислено ${promoData.points} баллов`, 'success');
+                    document.getElementById('promo-code').value = '';
+                    await updatePointsDisplay();
+                    await loadPromoCodes();
+                }
+                
+            } catch (error) {
+                console.error('❌ Ошибка активации промокода:', error);
+                showMessage('Ошибка активации промокода', 'error');
+            }
+        }
+
+        // Обмен баллов на скидку
+        async function exchangePoints(pointsAmount, discountAmount) {
+            if (!state.currentUser) {
+                showMessage('Войдите в систему для обмена баллов', 'error');
+                return;
+            }
+            
+            const pointsNum = parseInt(pointsAmount);
+            const discountNum = parseInt(discountAmount);
+            
+            // Проверяем баланс
+            const pointsData = await getUserPoints(state.currentUser.uid);
+            if (!pointsData || pointsData.balance < pointsNum) {
+                showMessage(`Недостаточно баллов. Ваш баланс: ${pointsData?.balance || 0}`, 'error');
+                return;
+            }
+            
+            if (confirm(`Обменять ${pointsNum} баллов на скидку ${discountNum} руб. в следующем заказе?`)) {
+                // Списываем баллы
+                const success = await addPoints(state.currentUser.uid, -pointsNum, 'exchange', 
+                    `Обмен на скидку ${discountNum} руб.`);
+                
+                if (success) {
+                    // Сохраняем скидку
+                    const discount = {
+                        amount: discountNum,
+                        pointsUsed: pointsNum,
+                        date: new Date().toISOString(),
+                        used: false
+                    };
+                    
+                    // Сохраняем в localStorage
+                    let userDiscounts = JSON.parse(localStorage.getItem('smileDiscounts') || '{}');
+                    if (!userDiscounts[state.currentUser.uid]) {
+                        userDiscounts[state.currentUser.uid] = [];
+                    }
+                    userDiscounts[state.currentUser.uid].push(discount);
+                    localStorage.setItem('smileDiscounts', JSON.stringify(userDiscounts));
+                    
+                    // Обновляем активную скидку
+                    state.activeDiscount = discount;
+                    
+                    showMessage(`Успешно! Вы получили скидку ${discountNum} руб. для следующего заказа`, 'success');
+                    document.getElementById('exchange-status').innerHTML = `
+                        <div style="background: var(--success); color: white; padding: 0.5rem; border-radius: 5px;">
+                            Активная скидка: ${discountNum} руб. (использовано ${pointsNum} баллов)
+                        </div>
+                    `;
+                    await updatePointsDisplay();
+                }
+            }
+        }
+
+        // Применение скидки из баллов к заказу
+        async function applyPointsDiscount(orderTotal) {
+            if (!state.currentUser) return orderTotal;
+            
+            const userDiscounts = JSON.parse(localStorage.getItem('smileDiscounts') || '{}');
+            const discounts = userDiscounts[state.currentUser.uid] || [];
+            const activeDiscount = discounts.find(d => !d.used);
+            
+            if (activeDiscount) {
+                const finalTotal = Math.max(0, orderTotal - activeDiscount.amount);
+                showMessage(`Применена скидка ${activeDiscount.amount} руб. за ${activeDiscount.pointsUsed} баллов`, 'success');
+                
+                // Помечаем скидку как использованную
+                activeDiscount.used = true;
+                activeDiscount.usedDate = new Date().toISOString();
+                localStorage.setItem('smileDiscounts', JSON.stringify(userDiscounts));
+                
+                return finalTotal;
+            }
+            
+            return orderTotal;
+        }
+
+        // Уведомление о начислении баллов
+        function showPointsNotification(points, reason) {
+            const notification = document.createElement('div');
+            notification.className = 'points-notification';
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; padding: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-radius: 8px; margin-bottom: 1rem; animation: slideIn 0.3s ease;">
+                    <div style="margin-right: 1rem; font-size: 1.5rem;">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: bold;">+${points} баллов</div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">${reason}</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Загрузка промокодов
+        async function loadPromoCodes() {
+            try {
+                const snapshot = await db.collection('promoCodes').get();
+                state.promoCodes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Для админ-таблицы
+                const adminTable = document.getElementById('admin-promocodes-table');
+                adminTable.innerHTML = state.promoCodes.map(promo => `
+                    <tr>
+                        <td><strong>${promo.code}</strong></td>
+                        <td>${promo.points}</td>
+                        <td>${promo.usedBy?.length || 0}/${promo.maxUses || '∞'}</td>
+                        <td>${promo.expires ? new Date(promo.expires).toLocaleDateString() : 'Бессрочно'}</td>
+                        <td>${promo.active ? '<span style="color: green;">Активен</span>' : '<span style="color: red;">Неактивен</span>'}</td>
+                        <td>
+                            <button class="action-btn btn-edit" onclick="editPromoCode('${promo.id}')">Редактировать</button>
+                            <button class="action-btn btn-delete" onclick="deletePromoCode('${promo.id}')">Удалить</button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+                // Для пользовательского интерфейса
+                const userPromoList = document.getElementById('promo-list');
+                const activePromos = state.promoCodes.filter(p => p.active && 
+                    (!p.expires || new Date(p.expires) > new Date()) &&
+                    (!p.maxUses || !p.usedBy || p.usedBy.length < p.maxUses));
+                
+                if (activePromos.length === 0) {
+                    userPromoList.innerHTML = '<p style="color: var(--text-light);">Нет активных промокодов</p>';
+                } else {
+                    userPromoList.innerHTML = activePromos.map(promo => `
+                        <div style="background: var(--background); padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 5px; border: 1px solid var(--border);">
+                            <div style="display: flex; justify-content: space-between;">
+                                <div>
+                                    <strong>${promo.code}</strong> - ${promo.points} баллов
+                                </div>
+                                <div style="color: var(--text-light); font-size: 0.8rem;">
+                                    ${promo.expires ? `до ${new Date(promo.expires).toLocaleDateString()}` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                
+            } catch (error) {
+                console.error('❌ Ошибка загрузки промокодов:', error);
+            }
+        }
+
+        // Загрузка данных для админ-панели баллов
+        async function loadAdminPointsData() {
+            if (!state.currentUser || state.currentUser.role !== 'admin') return;
+            
+            try {
+                // Загружаем пользователей с их баллами
+                const usersSnapshot = await db.collection('users').get();
+                const pointsPromises = usersSnapshot.docs.map(doc => getUserPoints(doc.id));
+                const pointsData = await Promise.all(pointsPromises);
+                
+                // Заполняем таблицу пользователей
+                const tableBody = document.getElementById('admin-points-table');
+                tableBody.innerHTML = usersSnapshot.docs.map((doc, index) => {
+                    const user = doc.data();
+                    const points = pointsData[index] || { balance: 0, totalEarned: 0, level: 'novice' };
+                    
+                    return `
+                        <tr>
+                            <td>${user.name || 'Без имени'}</td>
+                            <td>${user.email}</td>
+                            <td style="font-weight: bold; color: ${points.balance > 0 ? 'var(--accent)' : 'var(--text-light)'}">
+                                ${points.balance || 0}
+                            </td>
+                            <td>${points.totalEarned || 0}</td>
+                            <td><span class="tag">${POINTS_CONFIG.LEVELS[points.level]?.name || points.level}</span></td>
+                            <td>
+                                <button class="action-btn btn-edit" onclick="adminAddPoints('${doc.id}')">
+                                    <i class="fas fa-plus"></i> Начислить
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                // Заполняем селект пользователей
+                const userSelect = document.getElementById('points-user-select');
+                userSelect.innerHTML = '<option value="">Выберите пользователя</option>' +
+                    usersSnapshot.docs.map(doc => {
+                        const user = doc.data();
+                        const points = pointsData.find(p => p && p.userId === doc.id);
+                        return `<option value="${doc.id}">${user.name} (${user.email}) - ${points?.balance || 0} баллов</option>`;
+                    }).join('');
+                
+                // Загружаем промокоды
+                await loadPromoCodes();
+                
+                // Загружаем историю операций
+                await loadAdminPointsHistory();
+                
+            } catch (error) {
+                console.error('❌ Ошибка загрузки данных для админ-панели баллов:', error);
+            }
+        }
+
+        // Загрузка истории для админ-панели
+        async function loadAdminPointsHistory() {
+            try {
+                const snapshot = await db.collection('pointsHistory')
+                    .orderBy('date', 'desc')
+                    .limit(50)
+                    .get();
+                
+                const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Получаем имена пользователей
+                const userIds = [...new Set(history.map(h => h.userId))];
+                const userPromises = userIds.map(id => db.collection('users').doc(id).get());
+                const userDocs = await Promise.all(userPromises);
+                const users = {};
+                userDocs.forEach((doc, index) => {
+                    if (doc.exists) {
+                        users[userIds[index]] = doc.data();
+                    }
+                });
+                
+                const historyTable = document.getElementById('admin-points-history');
+                historyTable.innerHTML = history.map(item => {
+                    const user = users[item.userId] || { name: 'Неизвестный', email: 'Нет email' };
+                    return `
+                        <tr>
+                            <td>${new Date(item.date).toLocaleDateString()}</td>
+                            <td>${user.name} (${user.email})</td>
+                            <td style="color: ${item.amount > 0 ? 'green' : 'red'}; font-weight: bold;">
+                                ${item.amount > 0 ? '+' : ''}${item.amount}
+                            </td>
+                            <td>${item.type}</td>
+                            <td>${item.description}</td>
+                            <td>${item.balanceAfter}</td>
+                        </tr>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('❌ Ошибка загрузки истории для админ-панели:', error);
+            }
+        }
+
+        // Начисление баллов админом
+        async function adminAddPoints(userId) {
+            const points = prompt('Введите количество баллов (отрицательное для списания):', '100');
+            const reason = prompt('Введите причину начисления/списания:', 'Бонус от администратора');
+            
+            if (points && reason) {
+                const pointsNum = parseInt(points);
+                if (!isNaN(pointsNum)) {
+                    const success = await addPoints(userId, pointsNum, 'admin', reason);
+                    if (success) {
+                        showMessage(`Успешно ${pointsNum > 0 ? 'начислено' : 'списано'} ${Math.abs(pointsNum)} баллов`, 'success');
+                        loadAdminPointsData();
+                    } else {
+                        showMessage('Ошибка при начислении баллов', 'error');
+                    }
+                }
+            }
+        }
+
+        // Редактирование промокода
+        async function editPromoCode(id) {
+            const promo = state.promoCodes.find(p => p.id === id);
+            if (!promo) return;
+            
+            document.getElementById('promo-code-input').value = promo.code;
+            document.getElementById('promo-points').value = promo.points;
+            document.getElementById('promo-expires').value = promo.expires ? new Date(promo.expires).toISOString().split('T')[0] : '';
+            document.getElementById('promo-max-uses').value = promo.maxUses || 100;
+            
+            document.getElementById('promo-form-container').style.display = 'block';
+            document.getElementById('promo-form-title').textContent = 'Редактировать промокод';
+            
+            // Сохраняем ID для обновления
+            const form = document.getElementById('promo-form');
+            form.dataset.editId = id;
+        }
+
+        // Удаление промокода
+        async function deletePromoCode(id) {
+            if (confirm('Вы уверены, что хотите удалить этот промокод?')) {
+                try {
+                    await db.collection('promoCodes').doc(id).delete();
+                    showMessage('Промокод успешно удален!', 'success');
+                    await loadPromoCodes();
+                    loadAdminPointsData();
+                } catch (error) {
+                    console.error('❌ Ошибка удаления промокода:', error);
+                    showMessage('Ошибка при удалении промокода', 'error');
+                }
+            }
+        }
+
         // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
         function loadFromLocalStorage() {
@@ -1992,12 +2946,14 @@
             const savedTags = localStorage.getItem('smileTags');
             const savedCart = localStorage.getItem('smileCart');
             const savedTheme = localStorage.getItem('smileTheme');
+            const savedPromoCodes = localStorage.getItem('smilePromoCodes');
 
             if (savedProducts) state.products = JSON.parse(savedProducts);
             if (savedUsers) state.users = JSON.parse(savedUsers);
             if (savedReviews) state.reviews = JSON.parse(savedReviews);
             if (savedTags) state.tags = JSON.parse(savedTags);
             if (savedCart) state.cart = JSON.parse(savedCart);
+            if (savedPromoCodes) state.promoCodes = JSON.parse(savedPromoCodes);
             if (savedTheme) {
                 state.currentTheme = savedTheme;
                 document.getElementById('theme-select').value = savedTheme;
@@ -2058,6 +3014,28 @@
                 { name: "fresh", count: 1, createdAt: new Date().toISOString() }
             ];
 
+            // Создаем демо-промокоды
+            const defaultPromoCodes = [
+                {
+                    code: "WELCOME100",
+                    points: 100,
+                    active: true,
+                    usedBy: [],
+                    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                    maxUses: 100,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    code: "SMILE50",
+                    points: 50,
+                    active: true,
+                    usedBy: [],
+                    expires: null,
+                    maxUses: 500,
+                    createdAt: new Date().toISOString()
+                }
+            ];
+
             try {
                 // Сохраняем теги
                 for (const tag of defaultTags) {
@@ -2070,6 +3048,12 @@
                     await saveProductToFirebase(product);
                 }
                 console.log('✅ Демо-товары созданы');
+
+                // Сохраняем промокоды
+                for (const promo of defaultPromoCodes) {
+                    await db.collection('promoCodes').add(promo);
+                }
+                console.log('✅ Демо-промокоды созданы');
 
                 // Перезагружаем данные
                 await loadDataFromFirebase();
@@ -2094,6 +3078,9 @@
                         email: email,
                         role: 'user'
                     });
+                    
+                    // Инициализируем баллы
+                    await initializeUserPoints(userCredential.user.uid, name);
                     
                 } else {
                     // Вход существующего пользователя
@@ -2142,11 +3129,16 @@
                         const cartDoc = await db.collection('carts').doc(user.uid).get();
                         state.cart = cartDoc.exists ? cartDoc.data().items || [] : [];
                         
+                        // Загружаем баллы пользователя
+                        await updatePointsDisplay();
+                        
                         updateCartDisplay();
                         console.log(`👤 Пользователь вошел: ${user.email}`);
                     } else {
                         state.currentUser = null;
                         state.cart = [];
+                        state.userPoints = null;
+                        document.getElementById('points-badge').style.display = 'none';
                         console.log('👤 Пользователь вышел');
                     }
                     
@@ -2262,6 +3254,10 @@
                 
                 // Обновляем локальное состояние
                 state.reviews.push({ ...newReview, id: reviewId });
+                
+                // Начисляем баллы за отзыв
+                await addPoints(state.currentUser.uid, POINTS_CONFIG.REVIEW_BONUS, 'review', 
+                    `Начисление за отзыв к товару "${getProductName(productId)}"`, null, productId);
                 
                 showMessage('Спасибо за ваш отзыв!', 'success');
                 document.getElementById('product-modal').classList.remove('active');
@@ -2527,6 +3523,159 @@
                     e.target.classList.remove('active');
                 }
             });
+
+            // Баллы: активация промокода
+            document.getElementById('apply-promo').addEventListener('click', applyPromoCode);
+
+            // Баллы: обмен на скидки
+            document.querySelectorAll('.exchange-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    exchangePoints(this.dataset.points, this.dataset.discount);
+                });
+            });
+
+            // Админ: управление баллами
+            document.getElementById('apply-points-btn').addEventListener('click', async function() {
+                const userId = document.getElementById('points-user-select').value;
+                const amount = parseInt(document.getElementById('points-amount').value);
+                const reason = document.getElementById('points-reason').value;
+                
+                if (!userId || !amount || !reason) {
+                    showMessage('Заполните все поля', 'error');
+                    return;
+                }
+                
+                const success = await addPoints(userId, amount, 'admin', reason);
+                if (success) {
+                    showMessage(`Успешно ${amount > 0 ? 'начислено' : 'списано'} ${Math.abs(amount)} баллов`, 'success');
+                    document.getElementById('points-amount').value = '';
+                    document.getElementById('points-reason').value = '';
+                    loadAdminPointsData();
+                }
+            });
+
+            // Админ: создание промокода
+            document.getElementById('create-promo-btn').addEventListener('click', function() {
+                document.getElementById('promo-form-container').style.display = 'block';
+                document.getElementById('promo-form-title').textContent = 'Создать промокод';
+                document.getElementById('promo-form').reset();
+                delete document.getElementById('promo-form').dataset.editId;
+            });
+
+            document.getElementById('cancel-promo-btn').addEventListener('click', function() {
+                document.getElementById('promo-form-container').style.display = 'none';
+            });
+
+            document.getElementById('promo-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const code = document.getElementById('promo-code-input').value.toUpperCase();
+                const points = parseInt(document.getElementById('promo-points').value);
+                const expires = document.getElementById('promo-expires').value;
+                const maxUses = parseInt(document.getElementById('promo-max-uses').value);
+                const editId = this.dataset.editId;
+                
+                if (!code || !points) {
+                    showMessage('Заполните обязательные поля', 'error');
+                    return;
+                }
+                
+                const promoData = {
+                    code: code,
+                    points: points,
+                    active: true,
+                    usedBy: [],
+                    createdAt: new Date().toISOString(),
+                    maxUses: maxUses || 100
+                };
+                
+                if (expires) {
+                    promoData.expires = new Date(expires).toISOString();
+                }
+                
+                try {
+                    if (editId) {
+                        // Редактирование
+                        await db.collection('promoCodes').doc(editId).update(promoData);
+                        showMessage('Промокод успешно обновлен!', 'success');
+                    } else {
+                        // Создание
+                        await db.collection('promoCodes').add(promoData);
+                        showMessage('Промокод успешно создан!', 'success');
+                    }
+                    
+                    document.getElementById('promo-form').reset();
+                    document.getElementById('promo-form-container').style.display = 'none';
+                    delete document.getElementById('promo-form').dataset.editId;
+                    await loadPromoCodes();
+                    loadAdminPointsData();
+                } catch (error) {
+                    console.error('❌ Ошибка сохранения промокода:', error);
+                    showMessage('Ошибка при сохранении промокода', 'error');
+                }
+            });
+
+            // Оформление заказа
+            document.getElementById('checkout-btn').addEventListener('click', async function() {
+                if (state.cart.length === 0) {
+                    showMessage('Корзина пуста', 'error');
+                    return;
+                }
+                
+                if (!state.currentUser) {
+                    showMessage('Войдите, чтобы оформить заказ', 'error');
+                    return;
+                }
+                
+                try {
+                    const totalPrice = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    
+                    // Применяем скидку из баллов
+                    const finalPrice = await applyPointsDiscount(totalPrice);
+                    
+                    // Создаем заказ
+                    const orderData = {
+                        userId: state.currentUser.uid,
+                        items: state.cart,
+                        total: totalPrice,
+                        finalTotal: finalPrice,
+                        status: 'pending',
+                        date: new Date().toISOString(),
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    const orderRef = await db.collection('orders').add(orderData);
+                    
+                    // Начисляем баллы за покупку (1% от суммы)
+                    const pointsBonus = Math.floor(totalPrice * POINTS_CONFIG.PURCHASE_PERCENT);
+                    if (pointsBonus > 0) {
+                        await addPoints(state.currentUser.uid, pointsBonus, 'purchase', 
+                            `Начисление за покупку на сумму ${totalPrice} руб.`, orderRef.id);
+                    }
+                    
+                    // Очищаем корзину
+                    state.cart = [];
+                    await saveCartToFirebase();
+                    localStorage.setItem('smileCart', JSON.stringify(state.cart));
+                    
+                    updateCartCount();
+                    updateCartDisplay();
+                    
+                    showMessage(`Заказ оформлен! Номер заказа: ${orderRef.id}. Начислено ${pointsBonus} баллов`, 'success');
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка оформления заказа:', error);
+                    showMessage('Ошибка при оформлении заказа', 'error');
+                }
+            });
+
+            // Поле промокода - обработка Enter
+            document.getElementById('promo-code').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyPromoCode();
+                }
+            });
         }
 
         // Выход из системы
@@ -2535,8 +3684,10 @@
                 await auth.signOut();
                 state.currentUser = null;
                 state.cart = [];
+                state.userPoints = null;
                 updateAuthButton();
                 updateCartDisplay();
+                document.getElementById('points-badge').style.display = 'none';
                 showMessage('Вы вышли из системы', 'success');
             } catch (error) {
                 console.error('Ошибка выхода:', error);
@@ -2590,6 +3741,13 @@
 
             if (tabName === 'cart') {
                 updateCartDisplay();
+            } else if (tabName === 'points') {
+                if (state.currentUser) {
+                    updatePointsDisplay();
+                } else {
+                    showMessage('Войдите, чтобы увидеть свои баллы', 'error');
+                    switchTab('home');
+                }
             }
         }
 
@@ -2682,7 +3840,7 @@
                 </tr>
             `).join('');
 
-            // Загрузка тегов
+            // Загрузка теги
             const tagsTable = document.getElementById('admin-tags-table');
             tagsTable.innerHTML = state.tags.map(tag => `
                 <tr>
@@ -2695,7 +3853,7 @@
                 </tr>
             `).join('');
 
-            // Загрузка отзывов
+            // Загрузка отзывы
             const reviewsTable = document.getElementById('admin-reviews-table');
             reviewsTable.innerHTML = state.reviews.map(review => `
                 <tr>
@@ -2710,7 +3868,7 @@
                 </tr>
             `).join('');
 
-            // Загрузка пользователей
+            // Загрузка пользователи
             const usersTable = document.getElementById('admin-users-table');
             usersTable.innerHTML = state.users.map(user => `
                 <tr>
@@ -2723,6 +3881,9 @@
                     </td>
                 </tr>
             `).join('');
+
+            // Загрузка данные баллов
+            loadAdminPointsData();
         }
 
         function switchAdminTab(tabName) {
@@ -2736,6 +3897,10 @@
 
             document.getElementById(`admin-${tabName}`).classList.add('active');
             document.querySelector(`.admin-tab[data-admin-tab="${tabName}"]`).classList.add('active');
+
+            if (tabName === 'points') {
+                loadAdminPointsData();
+            }
         }
 
         function showProductForm(product = null) {
@@ -2920,12 +4085,14 @@
             const cartItemsContainer = document.getElementById('cart-items');
             const totalItemsElement = document.getElementById('total-items');
             const totalPriceElement = document.getElementById('total-price');
+            const pointsDiscountElement = document.getElementById('points-discount');
             const finalPriceElement = document.getElementById('final-price');
 
             if (state.cart.length === 0) {
                 cartItemsContainer.innerHTML = '<p style="text-align: center; color: var(--text-light)">Ваша корзина пуста</p>';
                 totalItemsElement.textContent = '0';
                 totalPriceElement.textContent = '0 руб.';
+                pointsDiscountElement.textContent = '0 руб.';
                 finalPriceElement.textContent = '0 руб.';
                 return;
             }
@@ -2957,9 +4124,24 @@
             const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
             const totalPrice = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+            // Проверяем активную скидку из баллов
+            let discountAmount = 0;
+            if (state.currentUser) {
+                const userDiscounts = JSON.parse(localStorage.getItem('smileDiscounts') || '{}');
+                const discounts = userDiscounts[state.currentUser.uid] || [];
+                const activeDiscount = discounts.find(d => !d.used);
+                if (activeDiscount) {
+                    discountAmount = activeDiscount.amount;
+                    state.activeDiscount = activeDiscount;
+                }
+            }
+
+            const finalPrice = Math.max(0, totalPrice - discountAmount);
+
             totalItemsElement.textContent = totalItems;
             totalPriceElement.textContent = `${totalPrice} руб.`;
-            finalPriceElement.textContent = `${totalPrice} руб.`;
+            pointsDiscountElement.textContent = `${discountAmount} руб.`;
+            finalPriceElement.textContent = `${finalPrice} руб.`;
         }
 
         function openProductModal(productId) {
@@ -3223,6 +4405,25 @@
                 }
             }
         }
+
+        // Глобальные функции для вызова из HTML
+        window.addToCart = addToCart;
+        window.updateCartItemQuantity = updateCartItemQuantity;
+        window.removeFromCart = removeFromCart;
+        window.openProductModal = openProductModal;
+        window.submitReview = submitReview;
+        window.editProduct = editProduct;
+        window.deleteProduct = deleteProduct;
+        window.editTag = editTag;
+        window.deleteTag = deleteTag;
+        window.editReview = editReview;
+        window.deleteReview = deleteReview;
+        window.editUser = editUser;
+        window.deleteUser = deleteUser;
+        window.removeProductTag = removeProductTag;
+        window.adminAddPoints = adminAddPoints;
+        window.editPromoCode = editPromoCode;
+        window.deletePromoCode = deletePromoCode;
 
         // Имитация автообновления с сервера
         setInterval(async () => {
